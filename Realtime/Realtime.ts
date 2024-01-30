@@ -1,0 +1,136 @@
+import {
+  KuzzleMessage,
+  MessageHandler,
+  SubscriptionScopeInterest,
+  SubscriptionUserInterest,
+} from "../common";
+import { RequestHandler } from "../RequestHandler";
+import { Room } from "./Room";
+
+type SubscriptionResult = {
+  /**
+   * Koncorde room ID
+   */
+  roomId: string;
+  /**
+   * Channel ID is in the form of "roomID-channelIDHash"
+   * Depends on users/scope/cluster property
+   */
+  channel: string;
+};
+
+export class Realtime implements MessageHandler<unknown> {
+  private readonly roomsMap = new Map<string, Room>();
+  /**
+   * Used to restore subscriptions in case of a reconnection.
+   */
+  private readonly subscriptionChannelPayloads = new Map<string, object>();
+
+  constructor(private requestHandler: RequestHandler) {}
+
+  getPublicAPI() {
+    return {
+      subscribeToDocumentNotifications: this.subscribeToDocumentNotifications.bind(this),
+      subscribeToPresenceNotifications: this.subscribeToPresenceNotifications.bind(this),
+    };
+  }
+
+  handleMessage(data: KuzzleMessage<unknown>): boolean {
+    const channelID: string | undefined = data.room;
+    const roomID = channelID ? channelID.split("-")[0] : null; // Channel ID is in the form of "roomID-channelIDHash"
+
+    const matchingSubscriptionRoom = roomID ? this.roomsMap.get(roomID) : null;
+
+    if (channelID && matchingSubscriptionRoom) {
+      matchingSubscriptionRoom.notifyChannel(channelID, data);
+      return true;
+    }
+
+    return false;
+  }
+
+  async subscribeToDocumentNotifications(
+    args: { index: string; collection: string; scope: SubscriptionScopeInterest },
+    filters = {},
+    cb: (notification: unknown) => void,
+  ) {
+    const payload = {
+      ...args,
+      controller: "realtime",
+      action: "subscribe",
+      body: filters,
+      users: "none",
+    };
+
+    // Register callback for notifications.
+    return this.registerSubscriptionCallback(payload, cb);
+  }
+
+  async subscribeToPresenceNotifications(
+    args: { index: string; collection: string; users: SubscriptionUserInterest },
+    filters = {},
+    cb: (notification: unknown) => void,
+  ) {
+    const payload = {
+      ...args,
+      controller: "realtime",
+      action: "subscribe",
+      body: filters,
+      scope: "none", // No document in this callback.
+    };
+
+    // Register callback for notifications.
+    return this.registerSubscriptionCallback(payload, cb);
+  }
+
+  /**
+   * Restore any previous subscriptions in case of a reconnection.
+   */
+  async restoreSubscriptions() {
+    if (this.subscriptionChannelPayloads.size <= 0) return console.log("No subscriptions to restore.");
+
+    await Promise.all(
+      Array.from(this.subscriptionChannelPayloads).map(([channelID, requestPayload]) => {
+        console.log("Restoring subscriptions for room", channelID);
+        return this.requestHandler.sendRequest(requestPayload);
+      }),
+    );
+    console.log("Subscriptions restored.");
+  }
+
+  private async registerSubscriptionCallback(payload: object, cb: (notification: unknown) => void) {
+    const response = await this.requestHandler.sendRequest<SubscriptionResult>(payload);
+    const { roomId: roomID, channel: channelID } = response.result;
+
+    // Add payload to restore subscriptions in case of a reconnection.
+    this.subscriptionChannelPayloads.set(channelID, payload);
+
+    // Create room if not exists
+    if (!this.roomsMap.has(roomID)) this.roomsMap.set(roomID, new Room(roomID));
+
+    const room = this.roomsMap.get(roomID)!;
+
+    // Update channels for room
+    room.addObserver(channelID, cb); // Add channel to room
+
+    console.log("Room", roomID, room.infos());
+
+    return () => {
+      // Detach observer and update room
+      room.removeObserver(channelID, cb);
+
+      // Remove handler for restoring subscriptions in case of a reconnection.
+      if (!room.hasRemainingInterestForChannel(channelID)) this.subscriptionChannelPayloads.delete(channelID);
+
+      // Unsubscribe from room if no more interest.
+      if (!room.hasRemainingInterestForRoom()) {
+        console.log("Unsubscribing from room", roomID, "because no more interest.");
+        return this.requestHandler.sendRequest({
+          controller: "realtime",
+          action: "unsubscribe",
+          body: { roomId: roomID },
+        });
+      }
+    };
+  }
+}
