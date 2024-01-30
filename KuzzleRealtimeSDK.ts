@@ -11,8 +11,8 @@ export class KuzzleRealtimeSDK {
   readonly requestHandler;
   readonly realtime;
 
-  constructor(host: string, apiToken: string) {
-    const socket = new WebSocket(`ws://${host}:7512`);
+  constructor(host: string, apiToken: string, port?: number) {
+    const socket = new WebSocket(`ws://${host}:${port || 7515}`);
     const pingHandler = new PingHandler(socket);
     const requestHandler = new RequestHandler(socket, apiToken);
     this.requestHandler = requestHandler.getPublicAPI();
