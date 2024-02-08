@@ -317,6 +317,17 @@ var Document = class extends Controller {
     });
     return response.result;
   };
+  update = async (index, collection, id, body) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "document",
+      action: "update",
+      index,
+      collection,
+      _id: id,
+      body
+    });
+    return response.result;
+  };
   get = async (index, collection, id) => {
     const response = await this.requestHandler.sendRequest({
       controller: "document",

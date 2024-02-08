@@ -185,7 +185,7 @@ export class Realtime implements MessageHandler<unknown> {
           roomID,
           "because no more interest."
         );
-        return this.requestHandler.sendRequest({
+        return this.requestHandler.sendRequest<{ roomId: string }>({
           controller: "realtime",
           action: "unsubscribe",
           body: { roomId: roomID },

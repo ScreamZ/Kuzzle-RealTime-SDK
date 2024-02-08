@@ -79,7 +79,9 @@ declare class Realtime implements MessageHandler<unknown> {
         index: string;
         collection: string;
         scope: SubscriptionScopeInterest;
-    }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<unknown>> | undefined>;
+    }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<{
+        roomId: string;
+    }>> | undefined>;
     /**
      * Subscribe to presence notification, when user enter/leave same room.
      *
@@ -90,7 +92,9 @@ declare class Realtime implements MessageHandler<unknown> {
         index: string;
         collection: string;
         users: SubscriptionUserInterest;
-    }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<unknown>> | undefined>;
+    }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<{
+        roomId: string;
+    }>> | undefined>;
     /**
      * Send ephemeral notification. This is a one-time notification, not persisted in storage.
      *
@@ -105,12 +109,16 @@ declare class Realtime implements MessageHandler<unknown> {
             index: string;
             collection: string;
             scope: SubscriptionScopeInterest;
-        }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<unknown>> | undefined>;
+        }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<{
+            roomId: string;
+        }>> | undefined>;
         subscribeToPresenceNotifications: (args: {
             index: string;
             collection: string;
             users: SubscriptionUserInterest;
-        }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<unknown>> | undefined>;
+        }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<{
+            roomId: string;
+        }>> | undefined>;
         sendEphemeralNotification: (args: {
             index: string;
             collection: string;
@@ -141,6 +149,7 @@ declare class Index extends Controller {
 
 declare class Document extends Controller {
     create: (index: string, collection: string, body: object, id?: string) => Promise<boolean>;
+    update: (index: string, collection: string, id: string, body: object) => Promise<boolean>;
     get: (index: string, collection: string, id: string) => Promise<object>;
 }
 
