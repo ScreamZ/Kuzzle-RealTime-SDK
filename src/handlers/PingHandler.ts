@@ -1,6 +1,6 @@
 import { WebSocket } from "partysocket";
 
-import { KuzzleMessage, KuzzlePingMessage } from "./common";
+import { KuzzleMessage, KuzzlePingMessage } from "../common";
 
 export class PingHandler {
   private pingIntervalRef: NodeJS.Timeout | null = null;

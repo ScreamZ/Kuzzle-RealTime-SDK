@@ -14,7 +14,7 @@ interface SDKConfig {
         options?: ConstructorParameters<typeof WebSocket>[2];
     };
 }
-interface MessageHandler<T> {
+interface MessageHandler<T = unknown> {
     handleMessage: (message: KuzzleMessage<T>) => boolean;
     getPublicAPI(): object;
 }

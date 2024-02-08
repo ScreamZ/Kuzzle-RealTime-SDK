@@ -1,14 +1,15 @@
 import { WebSocket } from "partysocket";
 
 import { KuzzleMessage, KuzzlePingMessage, SDKConfig } from "./common";
-import { PingHandler } from "./PingHandler";
+import { PingHandler } from "./handlers/PingHandler";
 import { Realtime } from "./Realtime/Realtime";
-import { RequestHandler } from "./RequestHandler";
+import { RequestHandler } from "./handlers/RequestHandler";
 import { Collection } from "./controllers/Collection";
 import { Index } from "./controllers/Index";
 import { Document } from "./controllers/Document";
 import { Logger } from "./Logger";
 import { Authentication } from "./controllers/Authentication";
+import { AuthenticationHandler } from "./handlers/AuthenticationHandler";
 
 export class KuzzleRealtimeSDK {
   // Controllers
@@ -53,6 +54,7 @@ export class KuzzleRealtimeSDK {
       this.socket,
       this.config?.authToken
     );
+    const authHandler = new AuthenticationHandler(requestHandler);
     const realtime = new Realtime(requestHandler, this.logger);
 
     // Bind public APIs
@@ -71,6 +73,9 @@ export class KuzzleRealtimeSDK {
 
       // Short-circuit if message is a ping
       if (pingHandler.handleMessage(message)) return;
+
+      // Hook for authentication cleanup
+      if (authHandler.handleMessage(message)) return;
 
       // Short-circuit if message is a response to a request
       if (requestHandler.handleMessage(message)) return;

@@ -15,7 +15,7 @@ export interface SDKConfig {
     options?: ConstructorParameters<typeof WebSocket>[2];
   };
 }
-export interface MessageHandler<T> {
+export interface MessageHandler<T = unknown> {
   handleMessage: (message: KuzzleMessage<T>) => boolean;
   getPublicAPI(): object;
 }

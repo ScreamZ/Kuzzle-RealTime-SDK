@@ -8,7 +8,7 @@ import {
   SubscriptionUserInterest,
 } from "../common";
 import { Logger } from "../Logger";
-import { RequestHandler } from "../RequestHandler";
+import { RequestHandler } from "../handlers/RequestHandler";
 import { Room } from "./Room";
 
 type SubscriptionResult = {

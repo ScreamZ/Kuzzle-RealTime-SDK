@@ -1,7 +1,7 @@
 import { WebSocket } from "partysocket";
 import { nanoid } from "nanoid";
 
-import { KuzzleMessage, MessageHandler } from "./common";
+import { KuzzleMessage, MessageHandler } from "../common";
 
 type RequestHandlerFn = (response: KuzzleMessage<unknown>) => void;
 

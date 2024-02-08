@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 
 // src/KuzzleRealtimeSDK.ts
 
-// src/PingHandler.ts
+// src/handlers/PingHandler.ts
 var PingHandler = class {
   constructor(socket) {
     this.socket = socket;
@@ -443,6 +443,22 @@ var Authentication = class extends Controller {
   };
 };
 
+// src/handlers/AuthenticationHandler.ts
+var AuthenticationHandler = class {
+  constructor(requestHandler) {
+    this.requestHandler = requestHandler;
+  }
+  handleMessage(message) {
+    var _a;
+    if (((_a = message.error) == null ? void 0 : _a.id) === "security.token.invalid")
+      this.requestHandler.setAuthToken(void 0);
+    return false;
+  }
+  getPublicAPI() {
+    return {};
+  }
+};
+
 // src/KuzzleRealtimeSDK.ts
 var KuzzleRealtimeSDK = class {
   constructor(host, config) {
@@ -465,6 +481,7 @@ var KuzzleRealtimeSDK = class {
       this.socket,
       (_f = this.config) == null ? void 0 : _f.authToken
     );
+    const authHandler = new AuthenticationHandler(requestHandler);
     const realtime = new Realtime(requestHandler, this.logger);
     this.requestHandler = requestHandler.getPublicAPI();
     this.realtime = realtime.getPublicAPI();
@@ -477,6 +494,8 @@ var KuzzleRealtimeSDK = class {
         rawMessage.data || rawMessage
       );
       if (pingHandler.handleMessage(message))
+        return;
+      if (authHandler.handleMessage(message))
         return;
       if (requestHandler.handleMessage(message))
         return;
