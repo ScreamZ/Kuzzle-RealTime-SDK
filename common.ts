@@ -1,3 +1,8 @@
+export interface SDKConfig {
+  apiToken?: string;
+  port?: number;
+  ssl?: boolean;
+}
 export interface MessageHandler<T> {
   handleMessage: (message: KuzzleMessage<T>) => boolean;
   getPublicAPI(): object;

@@ -103,6 +103,7 @@ export class Realtime implements MessageHandler<unknown> {
   getPublicAPI = () => ({
     subscribeToDocumentNotifications: this.subscribeToDocumentNotifications,
     subscribeToPresenceNotifications: this.subscribeToPresenceNotifications,
+    sendEphemeralNotification: this.sendEphemeralNotification,
   });
 
   handleMessage(data: KuzzleMessage<unknown>): boolean {
@@ -123,8 +124,7 @@ export class Realtime implements MessageHandler<unknown> {
    * Restore any previous subscriptions in case of a reconnection.
    */
   restoreSubscriptions = async () => {
-    if (this.subscriptionChannelPayloads.size <= 0)
-      return console.log("No subscriptions to restore.");
+    if (this.subscriptionChannelPayloads.size <= 0) return;
 
     await Promise.all(
       Array.from(this.subscriptionChannelPayloads).map(

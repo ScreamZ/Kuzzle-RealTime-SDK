@@ -9,7 +9,7 @@ export class RequestHandler implements MessageHandler<unknown> {
   private readonly pendingRequests = new Map<string, RequestHandlerFn>();
   private readonly timeout = 5000;
 
-  constructor(private socket: WebSocket, private apiToken: string) {}
+  constructor(private socket: WebSocket, private apiToken?: string) {}
 
   getPublicAPI = () => ({
     sendRequest: this.sendRequest,
@@ -46,7 +46,7 @@ export class RequestHandler implements MessageHandler<unknown> {
         JSON.stringify({
           ...payload,
           requestId: id,
-          jwt: this.apiToken,
+          ...(this.apiToken && { jwt: this.apiToken }), // Add token if defined
         })
       );
     });
