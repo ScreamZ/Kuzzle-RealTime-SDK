@@ -80,6 +80,16 @@ declare class RequestHandler implements MessageHandler<unknown> {
     sendRequest: <Result>(payload: object) => Promise<KuzzleMessage<Result>>;
 }
 
+type DocumentSubscriptionArgs = {
+    index: string;
+    collection: string;
+    scope: SubscriptionScopeInterest;
+};
+type PresenceSubscriptionArgs = {
+    index: string;
+    collection: string;
+    users: SubscriptionUserInterest;
+};
 declare class Realtime implements MessageHandler<unknown> {
     private requestHandler;
     private logger;
@@ -95,26 +105,14 @@ declare class Realtime implements MessageHandler<unknown> {
      * @param filters Koncorde filters
      * @param cb Called when a notification is received and match filter
      */
-    subscribeToDocumentNotifications: <T extends Object>(args: {
-        index: string;
-        collection: string;
-        scope: SubscriptionScopeInterest;
-    }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<{
-        roomId: string;
-    }>> | undefined>;
+    subscribeToDocumentNotifications: <T extends Object>(args: DocumentSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<UnsubscribeFn>;
     /**
      * Subscribe to presence notification, when user enter/leave same room.
      *
      * @param filters Koncorde filters
      * @param cb Called when a notification is received and match filter
      */
-    subscribeToPresenceNotifications: (args: {
-        index: string;
-        collection: string;
-        users: SubscriptionUserInterest;
-    }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<{
-        roomId: string;
-    }>> | undefined>;
+    subscribeToPresenceNotifications: (args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<UnsubscribeFn>;
     /**
      * Send ephemeral notification. This is a one-time notification, not persisted in storage.
      *
@@ -125,20 +123,8 @@ declare class Realtime implements MessageHandler<unknown> {
         collection: string;
     }, payload: object) => Promise<KuzzleMessage<unknown>>;
     getPublicAPI: () => {
-        subscribeToDocumentNotifications: <T extends Object>(args: {
-            index: string;
-            collection: string;
-            scope: SubscriptionScopeInterest;
-        }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<{
-            roomId: string;
-        }>> | undefined>;
-        subscribeToPresenceNotifications: (args: {
-            index: string;
-            collection: string;
-            users: SubscriptionUserInterest;
-        }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<{
-            roomId: string;
-        }>> | undefined>;
+        subscribeToDocumentNotifications: <T extends Object>(args: DocumentSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<UnsubscribeFn>;
+        subscribeToPresenceNotifications: (args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<UnsubscribeFn>;
         sendEphemeralNotification: (args: {
             index: string;
             collection: string;
@@ -151,6 +137,10 @@ declare class Realtime implements MessageHandler<unknown> {
     restoreSubscriptions: () => Promise<void>;
     private registerSubscriptionCallback;
 }
+/**
+ * Returns the number of remaining subscriptions for the room.
+ */
+type UnsubscribeFn = () => Promise<number>;
 
 declare class Controller {
     protected requestHandler: RequestHandler;

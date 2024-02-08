@@ -193,7 +193,7 @@ var Realtime = class {
     const room = this.roomsMap.get(roomID);
     room.addObserver(channelID, cb);
     this.logger.log("New subscription", room.infos());
-    return () => {
+    return async () => {
       room.removeObserver(channelID, cb);
       if (!room.hasRemainingInterestForChannel(channelID))
         this.subscriptionChannelPayloads.delete(channelID);
@@ -203,12 +203,13 @@ var Realtime = class {
           roomID,
           "because no more interest."
         );
-        return this.requestHandler.sendRequest({
+        await this.requestHandler.sendRequest({
           controller: "realtime",
           action: "unsubscribe",
           body: { roomId: roomID }
         });
       }
+      return room.infos().total;
     };
   }
 };

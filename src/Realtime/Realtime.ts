@@ -23,6 +23,18 @@ type SubscriptionResult = {
   channel: string;
 };
 
+type DocumentSubscriptionArgs = {
+  index: string;
+  collection: string;
+  scope: SubscriptionScopeInterest;
+};
+
+type PresenceSubscriptionArgs = {
+  index: string;
+  collection: string;
+  users: SubscriptionUserInterest;
+};
+
 export class Realtime implements MessageHandler<unknown> {
   private readonly roomsMap = new Map<string, Room>();
   /**
@@ -39,14 +51,10 @@ export class Realtime implements MessageHandler<unknown> {
    * @param cb Called when a notification is received and match filter
    */
   public subscribeToDocumentNotifications = <T extends Object>(
-    args: {
-      index: string;
-      collection: string;
-      scope: SubscriptionScopeInterest;
-    },
+    args: DocumentSubscriptionArgs,
     filters = {},
     cb: (notification: KuzzleDocumentNotification<T>) => void
-  ) => {
+  ): Promise<UnsubscribeFn> => {
     const payload = {
       ...args,
       controller: "realtime",
@@ -69,14 +77,10 @@ export class Realtime implements MessageHandler<unknown> {
    * @param cb Called when a notification is received and match filter
    */
   public subscribeToPresenceNotifications = (
-    args: {
-      index: string;
-      collection: string;
-      users: SubscriptionUserInterest;
-    },
+    args: PresenceSubscriptionArgs,
     filters = {},
     cb: (notification: unknown) => void
-  ) => {
+  ): Promise<UnsubscribeFn> => {
     const payload = {
       ...args,
       controller: "realtime",
@@ -150,7 +154,7 @@ export class Realtime implements MessageHandler<unknown> {
   private async registerSubscriptionCallback(
     payload: object,
     cb: NotificationCallback
-  ) {
+  ): Promise<UnsubscribeFn> {
     const response = await this.requestHandler.sendRequest<SubscriptionResult>(
       payload
     );
@@ -171,7 +175,7 @@ export class Realtime implements MessageHandler<unknown> {
 
     this.logger.log("New subscription", room.infos());
 
-    return () => {
+    return async () => {
       // Detach observer and update room
       room.removeObserver(channelID, cb);
 
@@ -186,12 +190,19 @@ export class Realtime implements MessageHandler<unknown> {
           roomID,
           "because no more interest."
         );
-        return this.requestHandler.sendRequest<{ roomId: string }>({
+        await this.requestHandler.sendRequest<{ roomId: string }>({
           controller: "realtime",
           action: "unsubscribe",
           body: { roomId: roomID },
         });
       }
+
+      return room.infos().total;
     };
   }
 }
+
+/**
+ * Returns the number of remaining subscriptions for the room.
+ */
+type UnsubscribeFn = () => Promise<number>;
