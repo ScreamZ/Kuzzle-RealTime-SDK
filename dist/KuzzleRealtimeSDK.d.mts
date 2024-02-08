@@ -159,13 +159,41 @@ declare class Index extends Controller {
 
 declare class Document extends Controller {
     create: <T extends object>(index: string, collection: string, body: T, id?: string) => Promise<boolean>;
-    update: <T extends object>(index: string, collection: string, id: string, body: T) => Promise<boolean>;
+    update: <T extends object>(index: string, collection: string, id: string, body: Partial<T>) => Promise<boolean>;
     get: <T extends object = object>(index: string, collection: string, id: string) => Promise<{
         _id: string;
         _source: T;
     }>;
     exists: (index: string, collection: string, id: string) => Promise<boolean>;
+    search: <T extends object = object>(index: string, collection: string, body: SearchBody, options?: SearchOptions) => Promise<SearchResult<T>>;
 }
+type SearchBody = {
+    query?: object;
+    sort?: object;
+    aggregations?: object;
+};
+type SearchOptions = {
+    from?: number;
+    size?: number;
+    scroll?: string;
+    lang?: string;
+    verb?: string;
+};
+type SearchResult<T> = {
+    total: number;
+    hits: Array<{
+        _id: string;
+        index: string;
+        collection: string;
+        _score: number;
+        _source: T;
+        highlight?: object;
+        inner_hits?: object;
+    }>;
+    scrollId?: string;
+    aggregations?: object;
+    remaining?: number;
+};
 
 declare class KuzzleRealtimeSDK {
     private config?;

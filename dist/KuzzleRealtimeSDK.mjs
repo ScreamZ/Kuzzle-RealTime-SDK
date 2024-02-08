@@ -354,6 +354,17 @@ var Document = class extends Controller {
     });
     return response.result;
   };
+  search = async (index, collection, body, options = {}) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "document",
+      action: "search",
+      index,
+      collection,
+      body,
+      ...options
+    });
+    return response.result;
+  };
 };
 
 // src/Logger.ts

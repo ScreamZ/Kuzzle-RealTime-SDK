@@ -23,7 +23,7 @@ export class Document extends Controller {
     index: string,
     collection: string,
     id: string,
-    body: T
+    body: Partial<T>
   ) => {
     const response = await this.requestHandler.sendRequest<boolean>({
       controller: "document",
@@ -67,4 +67,52 @@ export class Document extends Controller {
 
     return response.result;
   };
+
+  search = async <T extends object = object>(
+    index: string,
+    collection: string,
+    body: SearchBody,
+    options: SearchOptions = {}
+  ) => {
+    const response = await this.requestHandler.sendRequest<SearchResult<T>>({
+      controller: "document",
+      action: "search",
+      index,
+      collection,
+      body,
+      ...options,
+    });
+
+    return response.result;
+  };
 }
+
+type SearchBody = {
+  query?: object;
+  sort?: object;
+  aggregations?: object;
+};
+
+type SearchOptions = {
+  from?: number;
+  size?: number;
+  scroll?: string;
+  lang?: string;
+  verb?: string;
+};
+
+type SearchResult<T> = {
+  total: number;
+  hits: Array<{
+    _id: string;
+    index: string;
+    collection: string;
+    _score: number;
+    _source: T;
+    highlight?: object;
+    inner_hits?: object;
+  }>;
+  scrollId?: string;
+  aggregations?: object;
+  remaining?: number;
+};
