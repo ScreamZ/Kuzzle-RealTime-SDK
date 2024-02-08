@@ -4,6 +4,10 @@ interface SDKConfig {
     apiToken?: string;
     port?: number;
     ssl?: boolean;
+    webSocket?: {
+        protocols?: ConstructorParameters<typeof WebSocket>[1];
+        options?: ConstructorParameters<typeof WebSocket>[2];
+    };
 }
 interface MessageHandler<T> {
     handleMessage: (message: KuzzleMessage<T>) => boolean;
