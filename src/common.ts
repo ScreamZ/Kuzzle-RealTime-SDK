@@ -14,7 +14,7 @@ export interface MessageHandler<T> {
   getPublicAPI(): object;
 }
 
-export type KuzzleMessage<Result> = {
+export type KuzzleMessage<Result = unknown> = {
   requestId: string;
   /**
    * This is badly named but in this is either
@@ -23,8 +23,35 @@ export type KuzzleMessage<Result> = {
    */
   room?: string;
   result: Result;
-  error: unknown;
+  error: {
+    code: number;
+    message: string;
+    id: string;
+    props: string[];
+    status: number;
+  } | null;
 };
+
+export type KuzzleNotificationMessage<T = unknown> = KuzzleMessage<T> & {
+  scope: "in" | "out";
+  timestamp: number;
+  action: string;
+};
+
+type CommonKuzzleDocumentNotification<Type, P = unknown> = {
+  timestamp: number;
+  type: Type;
+  scope: "in" | "out";
+  payload: P;
+};
+
+export type KuzzleDocumentNotification<T = unknown> =
+  | CommonKuzzleDocumentNotification<"ephemeral", { _source: T }>
+  | CommonKuzzleDocumentNotification<"document", { _id: string; _source: T }>;
+
+export type NotificationCallback = (
+  notification: KuzzleDocumentNotification
+) => void;
 
 export type KuzzlePingMessage = { p: 1 | 2 };
 

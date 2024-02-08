@@ -36,15 +36,24 @@ var Room = class {
     this.id = id;
   }
   channelsMap = /* @__PURE__ */ new Map();
-  notifyChannel(channel, notification) {
+  notifyChannel(channel, message) {
     if (!this.channelsMap.has(channel))
       return;
-    this.channelsMap.get(channel).forEach((notify) => notify(notification));
+    const mapped = {
+      scope: message.scope,
+      payload: message.result,
+      timestamp: message.timestamp,
+      type: message.action === "publish" ? "ephemeral" : "document"
+    };
+    this.channelsMap.get(channel).forEach((notify) => notify(mapped));
   }
   infos() {
     return {
       roomID: this.id,
-      total: Array.from(this.channelsMap.values()).reduce((acc, channelSet) => acc + channelSet.size, 0),
+      total: Array.from(this.channelsMap.values()).reduce(
+        (acc, channelSet) => acc + channelSet.size,
+        0
+      ),
       perChannel: Array.from(this.channelsMap).reduce(
         (acc, [channel, channelSet]) => ({
           ...acc,
@@ -100,7 +109,10 @@ var Realtime = class {
       body: filters,
       users: "none"
     };
-    return this.registerSubscriptionCallback(payload, cb);
+    return this.registerSubscriptionCallback(
+      payload,
+      cb
+    );
   };
   /**
    * Subscribe to presence notification, when user enter/leave same room.
@@ -143,7 +155,10 @@ var Realtime = class {
     const roomID = channelID ? channelID.split("-")[0] : null;
     const matchingSubscriptionRoom = roomID ? this.roomsMap.get(roomID) : null;
     if (channelID && matchingSubscriptionRoom) {
-      matchingSubscriptionRoom.notifyChannel(channelID, data);
+      matchingSubscriptionRoom.notifyChannel(
+        channelID,
+        data
+      );
       return true;
     }
     return false;
@@ -168,6 +183,8 @@ var Realtime = class {
     const response = await this.requestHandler.sendRequest(
       payload
     );
+    if (response.error)
+      throw new Error(`${response.error.id} - ${response.error.message}`);
     const { roomId: roomID, channel: channelID } = response.result;
     this.subscriptionChannelPayloads.set(channelID, payload);
     if (!this.roomsMap.has(roomID))

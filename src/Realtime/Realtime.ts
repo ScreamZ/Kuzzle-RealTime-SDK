@@ -1,6 +1,9 @@
 import {
+  KuzzleDocumentNotification,
   KuzzleMessage,
+  KuzzleNotificationMessage,
   MessageHandler,
+  NotificationCallback,
   SubscriptionScopeInterest,
   SubscriptionUserInterest,
 } from "../common";
@@ -34,14 +37,14 @@ export class Realtime implements MessageHandler<unknown> {
    * @param filters Koncorde filters
    * @param cb Called when a notification is received and match filter
    */
-  public subscribeToDocumentNotifications = (
+  public subscribeToDocumentNotifications = <T extends Object>(
     args: {
       index: string;
       collection: string;
       scope: SubscriptionScopeInterest;
     },
     filters = {},
-    cb: (notification: unknown) => void
+    cb: (notification: KuzzleDocumentNotification<T>) => void
   ) => {
     const payload = {
       ...args,
@@ -52,7 +55,10 @@ export class Realtime implements MessageHandler<unknown> {
     };
 
     // Register callback for notifications.
-    return this.registerSubscriptionCallback(payload, cb);
+    return this.registerSubscriptionCallback(
+      payload,
+      cb as NotificationCallback
+    );
   };
 
   /**
@@ -106,14 +112,17 @@ export class Realtime implements MessageHandler<unknown> {
     sendEphemeralNotification: this.sendEphemeralNotification,
   });
 
-  handleMessage(data: KuzzleMessage<unknown>): boolean {
+  handleMessage(data: KuzzleMessage): boolean {
     const channelID: string | undefined = data.room;
     const roomID = channelID ? channelID.split("-")[0] : null; // Channel ID is in the form of "roomID-channelIDHash"
 
     const matchingSubscriptionRoom = roomID ? this.roomsMap.get(roomID) : null;
 
     if (channelID && matchingSubscriptionRoom) {
-      matchingSubscriptionRoom.notifyChannel(channelID, data);
+      matchingSubscriptionRoom.notifyChannel(
+        channelID,
+        data as KuzzleNotificationMessage<any>
+      );
       return true;
     }
 
@@ -139,11 +148,13 @@ export class Realtime implements MessageHandler<unknown> {
 
   private async registerSubscriptionCallback(
     payload: object,
-    cb: (notification: unknown) => void
+    cb: NotificationCallback
   ) {
     const response = await this.requestHandler.sendRequest<SubscriptionResult>(
       payload
     );
+    if (response.error)
+      throw new Error(`${response.error.id} - ${response.error.message}`);
     const { roomId: roomID, channel: channelID } = response.result;
 
     // Add payload to restore subscriptions in case of a reconnection.
