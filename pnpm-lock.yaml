@@ -6,8 +6,8 @@ settings:
 
 dependencies:
   nanoid:
-    specifier: ^5.0.5
-    version: 5.0.5
+    specifier: ^3.3.7
+    version: 3.3.7
   partysocket:
     specifier: ^0.0.25
     version: 0.0.25
@@ -821,9 +821,9 @@ packages:
       thenify-all: 1.6.0
     dev: true
 
-  /nanoid@5.0.5:
-    resolution: {integrity: sha512-/Veqm+QKsyMY3kqi4faWplnY1u+VuKO3dD2binyPIybP31DRO29bPF+1mszgLnrR2KqSLceFLBNw0zmvDzN1QQ==}
-    engines: {node: ^18 || >=20}
+  /nanoid@3.3.7:
+    resolution: {integrity: sha512-eSRppjcPIatRIMC1U6UngP8XFcz8MQWGQdt1MTBQ7NaAmvXDfvNxbvWV3x2y6CdEUciCSsDHDQZbhYaB8QEo2g==}
+    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
     dev: false
 
