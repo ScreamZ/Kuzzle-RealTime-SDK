@@ -68,6 +68,18 @@ export class Document extends Controller {
     return response.result;
   };
 
+  delete = async (index: string, collection: string, id: string) => {
+    const response = await this.requestHandler.sendRequest<{ _id: string }>({
+      controller: "document",
+      action: "delete",
+      index,
+      collection,
+      _id: id,
+    });
+
+    return response.result._id;
+  };
+
   search = async <T extends object = object>(
     index: string,
     collection: string,

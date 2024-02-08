@@ -165,6 +165,7 @@ declare class Document extends Controller {
         _source: T;
     }>;
     exists: (index: string, collection: string, id: string) => Promise<boolean>;
+    delete: (index: string, collection: string, id: string) => Promise<string>;
     search: <T extends object = object>(index: string, collection: string, body: SearchBody, options?: SearchOptions) => Promise<SearchResult<T>>;
 }
 type SearchBody = {
