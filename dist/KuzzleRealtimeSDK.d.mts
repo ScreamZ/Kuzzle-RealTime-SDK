@@ -150,7 +150,10 @@ declare class Index extends Controller {
 declare class Document extends Controller {
     create: (index: string, collection: string, body: object, id?: string) => Promise<boolean>;
     update: (index: string, collection: string, id: string, body: object) => Promise<boolean>;
-    get: (index: string, collection: string, id: string) => Promise<object>;
+    get: <T>(index: string, collection: string, id: string) => Promise<{
+        _id: string;
+        _source: T;
+    }>;
 }
 
 declare class KuzzleRealtimeSDK {

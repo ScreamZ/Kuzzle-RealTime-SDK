@@ -37,8 +37,11 @@ export class Document extends Controller {
     return response.result;
   };
 
-  get = async (index: string, collection: string, id: string) => {
-    const response = await this.requestHandler.sendRequest<object>({
+  get = async <T>(index: string, collection: string, id: string) => {
+    const response = await this.requestHandler.sendRequest<{
+      _id: string;
+      _source: T;
+    }>({
       controller: "document",
       action: "get",
       index,
