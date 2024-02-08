@@ -38,19 +38,35 @@ export type KuzzleMessage<Result = unknown> = {
 export type KuzzleNotificationMessage<T = unknown> = KuzzleMessage<T> & {
   scope: "in" | "out";
   timestamp: number;
+  event: "write" | "delete" | "publish";
   action: string;
 };
 
 type CommonKuzzleDocumentNotification<Type, P = unknown> = {
   timestamp: number;
   type: Type;
+  event: "write" | "delete" | "publish";
+  /**
+   * - in: document enters (or stays) in the scope.
+   * - out: document leaves the scope.
+   */
   scope: "in" | "out";
   payload: P;
 };
 
 export type KuzzleDocumentNotification<T = unknown> =
   | CommonKuzzleDocumentNotification<"ephemeral", { _source: T }>
-  | CommonKuzzleDocumentNotification<"document", { _id: string; _source: T }>;
+  | CommonKuzzleDocumentNotification<
+      "document",
+      {
+        _id: string;
+        _source: T;
+        /**
+         * List of fields that have been updated (only available on document partial updates)
+         */
+        _updatedFields?: string[];
+      }
+    >;
 
 export type NotificationCallback = (
   notification: KuzzleDocumentNotification

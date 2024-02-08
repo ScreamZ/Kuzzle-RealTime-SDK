@@ -36,6 +36,11 @@ type KuzzleMessage<Result = unknown> = {
 type CommonKuzzleDocumentNotification<Type, P = unknown> = {
     timestamp: number;
     type: Type;
+    event: "write" | "delete" | "publish";
+    /**
+     * - in: document enters (or stays) in the scope.
+     * - out: document leaves the scope.
+     */
     scope: "in" | "out";
     payload: P;
 };
@@ -44,6 +49,10 @@ type KuzzleDocumentNotification<T = unknown> = CommonKuzzleDocumentNotification<
 }> | CommonKuzzleDocumentNotification<"document", {
     _id: string;
     _source: T;
+    /**
+     * List of fields that have been updated (only available on document partial updates)
+     */
+    _updatedFields?: string[];
 }>;
 type SubscriptionUserInterest = "all" | "in" | "out";
 type SubscriptionScopeInterest = "all" | "in" | "out";

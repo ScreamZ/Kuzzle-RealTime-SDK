@@ -44,7 +44,8 @@ var Room = class {
       scope: message.scope,
       payload: message.result,
       timestamp: message.timestamp,
-      type: message.action === "publish" ? "ephemeral" : "document"
+      event: message.event,
+      type: message.event === "publish" ? "ephemeral" : "document"
     };
     this.channelsMap.get(channel).forEach((notify) => notify(mapped));
   }
