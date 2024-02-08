@@ -158,8 +158,8 @@ declare class Index extends Controller {
 }
 
 declare class Document extends Controller {
-    create: (index: string, collection: string, body: object, id?: string) => Promise<boolean>;
-    update: (index: string, collection: string, id: string, body: object) => Promise<boolean>;
+    create: <T extends object>(index: string, collection: string, body: T, id?: string) => Promise<boolean>;
+    update: <T extends object>(index: string, collection: string, id: string, body: T) => Promise<boolean>;
     get: <T extends object = object>(index: string, collection: string, id: string) => Promise<{
         _id: string;
         _source: T;

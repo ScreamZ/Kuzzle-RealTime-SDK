@@ -1,10 +1,10 @@
 import { Controller } from "../Controller";
 
 export class Document extends Controller {
-  create = async (
+  create = async <T extends object>(
     index: string,
     collection: string,
-    body: object,
+    body: T,
     id?: string
   ) => {
     const response = await this.requestHandler.sendRequest<boolean>({
@@ -19,11 +19,11 @@ export class Document extends Controller {
     return response.result;
   };
 
-  update = async (
+  update = async <T extends object>(
     index: string,
     collection: string,
     id: string,
-    body: object
+    body: T
   ) => {
     const response = await this.requestHandler.sendRequest<boolean>({
       controller: "document",
