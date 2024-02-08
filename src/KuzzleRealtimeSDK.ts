@@ -13,7 +13,9 @@ export class KuzzleRealtimeSDK {
     const socket = new WebSocket(
       `${this.config?.ssl ? "wss" : "ws"}://${host}:${
         this.config?.port || 7512
-      }`
+      }`,
+      config?.webSocket?.protocols,
+      config?.webSocket?.options
     );
     if (process?.versions?.node !== null) socket.binaryType = "arraybuffer"; // https://github.com/partykit/partykit/issues/774#issuecomment-1926694586
 
