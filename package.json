@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/KuzzleRealtimeSDK.js",
   "module": "./dist/KuzzleRealtimeSDK.mjs",
-  "types": "./KuzzleRealtimeSDK.d.ts",
+  "types": "./dist/KuzzleRealtimeSDK.d.ts",
   "sideEffects": false,
   "scripts": {
     "build": "RELEASE=true tsup",
