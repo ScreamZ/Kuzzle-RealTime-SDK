@@ -10,8 +10,8 @@ export class PingHandler {
   handleMessage(
     message: KuzzleMessage<unknown> | KuzzlePingMessage
   ): message is KuzzlePingMessage {
-    if ("p" in message && message.p === 1) {
-      this.socket.send(JSON.stringify({ p: 2 }));
+    if ("p" in message) {
+      if (message.p === 1) this.socket.send(JSON.stringify({ p: 2 })); // Respond to request
       return true;
     }
     return false;

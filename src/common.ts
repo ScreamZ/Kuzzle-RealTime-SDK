@@ -2,6 +2,7 @@ import { WebSocket } from "partysocket";
 
 export interface SDKConfig {
   apiToken?: string;
+  debug?: boolean;
   port?: number;
   ssl?: boolean;
   webSocket?: {
@@ -18,8 +19,10 @@ export type KuzzleMessage<Result = unknown> = {
   requestId: string;
   /**
    * This is badly named but in this is either
-   * - request ID (but should rather rely on {@link KuzzleMessage.requestId})
-   * - channel ID for notifications
+   * - For request response its same than requestId
+   * - For document notification it's channel ID for notifications
+   *
+   * Therefore checking both is necessary to know what it is.
    */
   room?: string;
   result: Result;

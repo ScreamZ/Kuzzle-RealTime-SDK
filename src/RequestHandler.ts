@@ -18,6 +18,9 @@ export class RequestHandler implements MessageHandler<unknown> {
   });
 
   public handleMessage(message: KuzzleMessage<unknown>): boolean {
+    // If request ID is not the same as room, it's a notification.
+    if (message.requestId !== message.room) return false;
+
     const matchingRequestResolver = this.pendingRequests.get(message.requestId);
 
     if (!matchingRequestResolver) return false;

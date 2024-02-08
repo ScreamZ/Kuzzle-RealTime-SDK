@@ -7,6 +7,7 @@ import { RequestHandler } from "./RequestHandler";
 import { Collection } from "./controllers/Collection";
 import { Index } from "./controllers/Index";
 import { Document } from "./controllers/Document";
+import { Logger } from "./Logger";
 
 export class KuzzleRealtimeSDK {
   readonly requestHandler: ReturnType<RequestHandler["getPublicAPI"]>;
@@ -14,14 +15,18 @@ export class KuzzleRealtimeSDK {
   readonly collection: Collection;
   readonly index: Index;
   readonly document: Document;
+  readonly addEventListeners: (typeof WebSocket)["prototype"]["addEventListener"];
+  readonly removeEventListeners: (typeof WebSocket)["prototype"]["removeEventListener"];
 
   get isConnected() {
     return this.socket.readyState === this.socket.OPEN;
   }
 
+  private readonly logger: Logger;
   private readonly socket: WebSocket;
 
   constructor(host: string, private config?: SDKConfig) {
+    this.logger = new Logger(config?.debug ?? false);
     this.socket = new WebSocket(
       `${this.config?.ssl ? "wss" : "ws"}://${host}:${
         this.config?.port || 7512
@@ -32,13 +37,18 @@ export class KuzzleRealtimeSDK {
     if (process?.versions?.node !== null)
       this.socket.binaryType = "arraybuffer"; // https://github.com/partykit/partykit/issues/774#issuecomment-1926694586
 
+    this.addEventListeners = this.socket.addEventListener.bind(this.socket);
+    this.removeEventListeners = this.socket.removeEventListener.bind(
+      this.socket
+    );
+
     // Handlers
     const pingHandler = new PingHandler(this.socket);
     const requestHandler = new RequestHandler(
       this.socket,
       this.config?.apiToken
     );
-    const realtime = new Realtime(requestHandler);
+    const realtime = new Realtime(requestHandler, this.logger);
 
     // Bind public APIs
     this.requestHandler = requestHandler.getPublicAPI();
@@ -64,19 +74,23 @@ export class KuzzleRealtimeSDK {
     });
 
     this.socket.addEventListener("open", async () => {
-      console.log("SDK - Socket opened to Kuzzle");
+      this.logger.log("SDK - Socket opened to Kuzzle");
       pingHandler.initPing();
       await realtime.restoreSubscriptions();
     });
 
     this.socket.addEventListener("close", (event) => {
-      console.log(`SDK - Socket from Kuzzle closed [${event.reason}]`);
+      this.logger.log(`SDK - Socket from Kuzzle closed [${event.reason}]`);
       pingHandler.stopPing();
     });
 
     this.socket.addEventListener("error", (event) => {
-      console.log("SDK - Socket error", event);
+      this.logger.log("SDK - Socket error", event);
     });
+  }
+
+  on(event: "open" | "close" | "error", cb: (event: Event) => void) {
+    this.socket.addEventListener(event, cb);
   }
 
   disconnect() {

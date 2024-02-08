@@ -37,13 +37,29 @@ export class Document extends Controller {
     return response.result;
   };
 
-  get = async <T>(index: string, collection: string, id: string) => {
+  get = async <T extends object = object>(
+    index: string,
+    collection: string,
+    id: string
+  ) => {
     const response = await this.requestHandler.sendRequest<{
       _id: string;
       _source: T;
     }>({
       controller: "document",
       action: "get",
+      index,
+      collection,
+      _id: id,
+    });
+
+    return response.result;
+  };
+
+  exists = async (index: string, collection: string, id: string) => {
+    const response = await this.requestHandler.sendRequest<boolean>({
+      controller: "document",
+      action: "exists",
       index,
       collection,
       _id: id,

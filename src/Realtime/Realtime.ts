@@ -7,6 +7,7 @@ import {
   SubscriptionScopeInterest,
   SubscriptionUserInterest,
 } from "../common";
+import { Logger } from "../Logger";
 import { RequestHandler } from "../RequestHandler";
 import { Room } from "./Room";
 
@@ -29,7 +30,7 @@ export class Realtime implements MessageHandler<unknown> {
    */
   private readonly subscriptionChannelPayloads = new Map<string, object>();
 
-  constructor(private requestHandler: RequestHandler) {}
+  constructor(private requestHandler: RequestHandler, private logger: Logger) {}
 
   /**
    * Subscribe to document notifications. Those could be ephemeral or persistent.
@@ -138,12 +139,12 @@ export class Realtime implements MessageHandler<unknown> {
     await Promise.all(
       Array.from(this.subscriptionChannelPayloads).map(
         ([channelID, requestPayload]) => {
-          console.log("Restoring subscriptions for room", channelID);
+          this.logger.log("Restoring subscriptions for room", channelID);
           return this.requestHandler.sendRequest(requestPayload);
         }
       )
     );
-    console.log("Subscriptions restored.");
+    this.logger.log("Subscriptions restored.");
   };
 
   private async registerSubscriptionCallback(
@@ -168,7 +169,7 @@ export class Realtime implements MessageHandler<unknown> {
     // Update channels for room
     room.addObserver(channelID, cb); // Add channel to room
 
-    console.log("Room", roomID, room.infos());
+    this.logger.log("New subscription", room.infos());
 
     return () => {
       // Detach observer and update room
@@ -180,7 +181,7 @@ export class Realtime implements MessageHandler<unknown> {
 
       // Unsubscribe from room if no more interest.
       if (!room.hasRemainingInterestForRoom()) {
-        console.log(
+        this.logger.log(
           "Unsubscribing from room",
           roomID,
           "because no more interest."

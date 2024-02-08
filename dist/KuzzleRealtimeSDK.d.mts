@@ -2,6 +2,7 @@ import { WebSocket } from 'partysocket';
 
 interface SDKConfig {
     apiToken?: string;
+    debug?: boolean;
     port?: number;
     ssl?: boolean;
     webSocket?: {
@@ -17,8 +18,10 @@ type KuzzleMessage<Result = unknown> = {
     requestId: string;
     /**
      * This is badly named but in this is either
-     * - request ID (but should rather rely on {@link KuzzleMessage.requestId})
-     * - channel ID for notifications
+     * - For request response its same than requestId
+     * - For document notification it's channel ID for notifications
+     *
+     * Therefore checking both is necessary to know what it is.
      */
     room?: string;
     result: Result;
@@ -45,6 +48,13 @@ type KuzzleDocumentNotification<T = unknown> = CommonKuzzleDocumentNotification<
 type SubscriptionUserInterest = "all" | "in" | "out";
 type SubscriptionScopeInterest = "all" | "in" | "out";
 
+declare class Logger {
+    private isEnable;
+    constructor(isEnable: boolean);
+    log(...args: unknown[]): void;
+    setEnable(enable: boolean): void;
+}
+
 declare class RequestHandler implements MessageHandler<unknown> {
     private socket;
     private apiToken?;
@@ -63,12 +73,13 @@ declare class RequestHandler implements MessageHandler<unknown> {
 
 declare class Realtime implements MessageHandler<unknown> {
     private requestHandler;
+    private logger;
     private readonly roomsMap;
     /**
      * Used to restore subscriptions in case of a reconnection.
      */
     private readonly subscriptionChannelPayloads;
-    constructor(requestHandler: RequestHandler);
+    constructor(requestHandler: RequestHandler, logger: Logger);
     /**
      * Subscribe to document notifications. Those could be ephemeral or persistent.
      *
@@ -150,10 +161,11 @@ declare class Index extends Controller {
 declare class Document extends Controller {
     create: (index: string, collection: string, body: object, id?: string) => Promise<boolean>;
     update: (index: string, collection: string, id: string, body: object) => Promise<boolean>;
-    get: <T>(index: string, collection: string, id: string) => Promise<{
+    get: <T extends object = object>(index: string, collection: string, id: string) => Promise<{
         _id: string;
         _source: T;
     }>;
+    exists: (index: string, collection: string, id: string) => Promise<boolean>;
 }
 
 declare class KuzzleRealtimeSDK {
@@ -163,9 +175,13 @@ declare class KuzzleRealtimeSDK {
     readonly collection: Collection;
     readonly index: Index;
     readonly document: Document;
+    readonly addEventListeners: (typeof WebSocket)["prototype"]["addEventListener"];
+    readonly removeEventListeners: (typeof WebSocket)["prototype"]["removeEventListener"];
     get isConnected(): boolean;
+    private readonly logger;
     private readonly socket;
     constructor(host: string, config?: SDKConfig | undefined);
+    on(event: "open" | "close" | "error", cb: (event: Event) => void): void;
     disconnect(): void;
 }
 

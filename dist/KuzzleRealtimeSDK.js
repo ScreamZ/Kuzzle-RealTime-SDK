@@ -12,8 +12,9 @@ var PingHandler = class {
   }
   pingIntervalRef = null;
   handleMessage(message) {
-    if ("p" in message && message.p === 1) {
-      this.socket.send(JSON.stringify({ p: 2 }));
+    if ("p" in message) {
+      if (message.p === 1)
+        this.socket.send(JSON.stringify({ p: 2 }));
       return true;
     }
     return false;
@@ -87,8 +88,9 @@ var Room = class {
 
 // src/Realtime/Realtime.ts
 var Realtime = class {
-  constructor(requestHandler) {
+  constructor(requestHandler, logger) {
     this.requestHandler = requestHandler;
+    this.logger = logger;
   }
   roomsMap = /* @__PURE__ */ new Map();
   /**
@@ -172,12 +174,12 @@ var Realtime = class {
     await Promise.all(
       Array.from(this.subscriptionChannelPayloads).map(
         ([channelID, requestPayload]) => {
-          console.log("Restoring subscriptions for room", channelID);
+          this.logger.log("Restoring subscriptions for room", channelID);
           return this.requestHandler.sendRequest(requestPayload);
         }
       )
     );
-    console.log("Subscriptions restored.");
+    this.logger.log("Subscriptions restored.");
   };
   async registerSubscriptionCallback(payload, cb) {
     const response = await this.requestHandler.sendRequest(
@@ -191,13 +193,13 @@ var Realtime = class {
       this.roomsMap.set(roomID, new Room(roomID));
     const room = this.roomsMap.get(roomID);
     room.addObserver(channelID, cb);
-    console.log("Room", roomID, room.infos());
+    this.logger.log("New subscription", room.infos());
     return () => {
       room.removeObserver(channelID, cb);
       if (!room.hasRemainingInterestForChannel(channelID))
         this.subscriptionChannelPayloads.delete(channelID);
       if (!room.hasRemainingInterestForRoom()) {
-        console.log(
+        this.logger.log(
           "Unsubscribing from room",
           roomID,
           "because no more interest."
@@ -224,6 +226,8 @@ var RequestHandler = class {
     setVolatileData: this.setVolatileData
   });
   handleMessage(message) {
+    if (message.requestId !== message.room)
+      return false;
     const matchingRequestResolver = this.pendingRequests.get(message.requestId);
     if (!matchingRequestResolver)
       return false;
@@ -340,6 +344,30 @@ var Document = class extends Controller {
     });
     return response.result;
   };
+  exists = async (index, collection, id) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "document",
+      action: "exists",
+      index,
+      collection,
+      _id: id
+    });
+    return response.result;
+  };
+};
+
+// src/Logger.ts
+var Logger = class {
+  constructor(isEnable) {
+    this.isEnable = isEnable;
+  }
+  log(...args) {
+    if (this.isEnable)
+      console.log(...args);
+  }
+  setEnable(enable) {
+    this.isEnable = enable;
+  }
 };
 
 // src/KuzzleRealtimeSDK.ts
@@ -347,6 +375,7 @@ var KuzzleRealtimeSDK = class {
   constructor(host, config) {
     this.config = config;
     var _a, _b, _c, _d, _e, _f;
+    this.logger = new Logger((config == null ? void 0 : config.debug) ?? false);
     this.socket = new partysocket.WebSocket(
       `${((_a = this.config) == null ? void 0 : _a.ssl) ? "wss" : "ws"}://${host}:${((_b = this.config) == null ? void 0 : _b.port) || 7512}`,
       (_c = config == null ? void 0 : config.webSocket) == null ? void 0 : _c.protocols,
@@ -354,12 +383,16 @@ var KuzzleRealtimeSDK = class {
     );
     if (((_e = process == null ? void 0 : process.versions) == null ? void 0 : _e.node) !== null)
       this.socket.binaryType = "arraybuffer";
+    this.addEventListeners = this.socket.addEventListener.bind(this.socket);
+    this.removeEventListeners = this.socket.removeEventListener.bind(
+      this.socket
+    );
     const pingHandler = new PingHandler(this.socket);
     const requestHandler = new RequestHandler(
       this.socket,
       (_f = this.config) == null ? void 0 : _f.apiToken
     );
-    const realtime = new Realtime(requestHandler);
+    const realtime = new Realtime(requestHandler, this.logger);
     this.requestHandler = requestHandler.getPublicAPI();
     this.realtime = realtime.getPublicAPI();
     this.collection = new Collection(requestHandler);
@@ -377,16 +410,16 @@ var KuzzleRealtimeSDK = class {
         return;
     });
     this.socket.addEventListener("open", async () => {
-      console.log("SDK - Socket opened to Kuzzle");
+      this.logger.log("SDK - Socket opened to Kuzzle");
       pingHandler.initPing();
       await realtime.restoreSubscriptions();
     });
     this.socket.addEventListener("close", (event) => {
-      console.log(`SDK - Socket from Kuzzle closed [${event.reason}]`);
+      this.logger.log(`SDK - Socket from Kuzzle closed [${event.reason}]`);
       pingHandler.stopPing();
     });
     this.socket.addEventListener("error", (event) => {
-      console.log("SDK - Socket error", event);
+      this.logger.log("SDK - Socket error", event);
     });
   }
   requestHandler;
@@ -394,10 +427,16 @@ var KuzzleRealtimeSDK = class {
   collection;
   index;
   document;
+  addEventListeners;
+  removeEventListeners;
   get isConnected() {
     return this.socket.readyState === this.socket.OPEN;
   }
+  logger;
   socket;
+  on(event, cb) {
+    this.socket.addEventListener(event, cb);
+  }
   disconnect() {
     this.socket.close();
   }

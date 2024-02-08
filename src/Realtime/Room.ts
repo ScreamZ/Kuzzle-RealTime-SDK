@@ -1,6 +1,5 @@
 import {
   KuzzleDocumentNotification,
-  KuzzleMessage,
   KuzzleNotificationMessage,
   NotificationCallback,
 } from "../common";
