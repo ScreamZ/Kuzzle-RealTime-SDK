@@ -4,32 +4,51 @@ import { KuzzleMessage, KuzzlePingMessage, SDKConfig } from "./common";
 import { PingHandler } from "./PingHandler";
 import { Realtime } from "./Realtime/Realtime";
 import { RequestHandler } from "./RequestHandler";
+import { Collection } from "./controllers/Collection";
+import { Index } from "./controllers/Index";
+import { Document } from "./controllers/Document";
 
 export class KuzzleRealtimeSDK {
   readonly requestHandler: ReturnType<RequestHandler["getPublicAPI"]>;
   readonly realtime: ReturnType<Realtime["getPublicAPI"]>;
+  readonly collection: Collection;
+  readonly index: Index;
+  readonly document: Document;
+
+  get isConnected() {
+    return this.socket.readyState === this.socket.OPEN;
+  }
+
+  private readonly socket: WebSocket;
 
   constructor(host: string, private config?: SDKConfig) {
-    const socket = new WebSocket(
+    this.socket = new WebSocket(
       `${this.config?.ssl ? "wss" : "ws"}://${host}:${
         this.config?.port || 7512
       }`,
       config?.webSocket?.protocols,
       config?.webSocket?.options
     );
-    if (process?.versions?.node !== null) socket.binaryType = "arraybuffer"; // https://github.com/partykit/partykit/issues/774#issuecomment-1926694586
+    if (process?.versions?.node !== null)
+      this.socket.binaryType = "arraybuffer"; // https://github.com/partykit/partykit/issues/774#issuecomment-1926694586
 
     // Handlers
-    const pingHandler = new PingHandler(socket);
-    const requestHandler = new RequestHandler(socket, this.config?.apiToken);
+    const pingHandler = new PingHandler(this.socket);
+    const requestHandler = new RequestHandler(
+      this.socket,
+      this.config?.apiToken
+    );
     const realtime = new Realtime(requestHandler);
 
     // Bind public APIs
     this.requestHandler = requestHandler.getPublicAPI();
     this.realtime = realtime.getPublicAPI();
+    this.collection = new Collection(requestHandler);
+    this.index = new Index(requestHandler);
+    this.document = new Document(requestHandler);
 
     // Sockets
-    socket.addEventListener("message", (rawMessage) => {
+    this.socket.addEventListener("message", (rawMessage) => {
       const message: KuzzleMessage<unknown> | KuzzlePingMessage = JSON.parse(
         rawMessage.data || rawMessage
       );
@@ -44,19 +63,23 @@ export class KuzzleRealtimeSDK {
       if (realtime.handleMessage(message)) return;
     });
 
-    socket.addEventListener("open", async () => {
+    this.socket.addEventListener("open", async () => {
       console.log("SDK - Socket opened to Kuzzle");
       pingHandler.initPing();
       await realtime.restoreSubscriptions();
     });
 
-    socket.addEventListener("close", (event) => {
+    this.socket.addEventListener("close", (event) => {
       console.log(`SDK - Socket from Kuzzle closed [${event.reason}]`);
       pingHandler.stopPing();
     });
 
-    socket.addEventListener("error", (event) => {
+    this.socket.addEventListener("error", (event) => {
       console.log("SDK - Socket error", event);
     });
+  }
+
+  disconnect() {
+    this.socket.close();
   }
 }

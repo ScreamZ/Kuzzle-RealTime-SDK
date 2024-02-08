@@ -31,7 +31,7 @@ export class RequestHandler implements MessageHandler<unknown> {
     this.volatile = data;
   };
 
-  public sendRequest = <Result extends object>(payload: object) =>
+  public sendRequest = <Result>(payload: object) =>
     new Promise<KuzzleMessage<Result>>((resolve, reject) => {
       const id = nanoid();
 
