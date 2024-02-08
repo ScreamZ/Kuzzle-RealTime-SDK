@@ -8,20 +8,24 @@ import { Realtime } from "./Realtime/Realtime";
 import { RequestHandler } from "./RequestHandler";
 
 export class KuzzleRealtimeSDK {
-  readonly requestHandler;
-  readonly realtime;
+  readonly requestHandler: ReturnType<RequestHandler["getPublicAPI"]>;
+  readonly realtime: ReturnType<Realtime["getPublicAPI"]>;
 
   constructor(host: string, apiToken: string, port?: number) {
     const socket = new WebSocket(`ws://${host}:${port || 7515}`);
+
+    // Handlers
     const pingHandler = new PingHandler(socket);
     const requestHandler = new RequestHandler(socket, apiToken);
     this.requestHandler = requestHandler.getPublicAPI();
     const realtime = new Realtime(requestHandler);
     this.realtime = realtime.getPublicAPI();
 
-    // message is received
+    // Sockets
     socket.addEventListener("message", (rawMessage) => {
-      const message: KuzzleMessage<unknown> | KuzzlePingMessage = JSON.parse(rawMessage.data || rawMessage);
+      const message: KuzzleMessage<unknown> | KuzzlePingMessage = JSON.parse(
+        rawMessage.data || rawMessage
+      );
 
       // Short-circuit if message is a ping
       if (pingHandler.handleMessage(message)) return;
@@ -34,18 +38,18 @@ export class KuzzleRealtimeSDK {
     });
 
     socket.addEventListener("open", async () => {
-      console.log("Connection opened");
+      console.log("SDK - Socket opened to Kuzzle");
       pingHandler.initPing();
       await realtime.restoreSubscriptions();
     });
 
     socket.addEventListener("close", (event) => {
+      console.log("SDK - Socket from Kuzzle closed", event.reason);
       pingHandler.stopPing();
-      console.log("closed", event);
     });
 
     socket.addEventListener("error", (event) => {
-      console.log("error", event);
+      console.log("SDK - Socket error", event.error.message);
     });
   }
 }

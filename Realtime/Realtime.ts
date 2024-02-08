@@ -28,12 +28,82 @@ export class Realtime implements MessageHandler<unknown> {
 
   constructor(private requestHandler: RequestHandler) {}
 
-  getPublicAPI() {
-    return {
-      subscribeToDocumentNotifications: this.subscribeToDocumentNotifications.bind(this),
-      subscribeToPresenceNotifications: this.subscribeToPresenceNotifications.bind(this),
+  /**
+   * Subscribe to document notifications. Those could be ephemeral or persistent.
+   *
+   * @param filters Koncorde filters
+   * @param cb Called when a notification is received and match filter
+   */
+  public subscribeToDocumentNotifications = (
+    args: {
+      index: string;
+      collection: string;
+      scope: SubscriptionScopeInterest;
+    },
+    filters = {},
+    cb: (notification: unknown) => void
+  ) => {
+    const payload = {
+      ...args,
+      controller: "realtime",
+      action: "subscribe",
+      body: filters,
+      users: "none",
     };
-  }
+
+    // Register callback for notifications.
+    return this.registerSubscriptionCallback(payload, cb);
+  };
+
+  /**
+   * Subscribe to presence notification, when user enter/leave same room.
+   *
+   * @param filters Koncorde filters
+   * @param cb Called when a notification is received and match filter
+   */
+  public subscribeToPresenceNotifications = (
+    args: {
+      index: string;
+      collection: string;
+      users: SubscriptionUserInterest;
+    },
+    filters = {},
+    cb: (notification: unknown) => void
+  ) => {
+    const payload = {
+      ...args,
+      controller: "realtime",
+      action: "subscribe",
+      body: filters,
+      scope: "none", // No document in this callback.
+    };
+
+    // Register callback for notifications.
+    return this.registerSubscriptionCallback(payload, cb);
+  };
+
+  /**
+   * Send ephemeral notification. This is a one-time notification, not persisted in storage.
+   *
+   * Handled in the same way as {@link subscribeToDocumentNotifications} but with a slightly different payload.
+   */
+  public sendEphemeralNotification = (
+    args: { index: string; collection: string },
+    payload: object
+  ) => {
+    return this.requestHandler.sendRequest({
+      ...args,
+      controller: "realtime",
+      action: "publish",
+      body: payload,
+    });
+  };
+
+  // Internal API
+  getPublicAPI = () => ({
+    subscribeToDocumentNotifications: this.subscribeToDocumentNotifications,
+    subscribeToPresenceNotifications: this.subscribeToPresenceNotifications,
+  });
 
   handleMessage(data: KuzzleMessage<unknown>): boolean {
     const channelID: string | undefined = data.room;
@@ -49,57 +119,31 @@ export class Realtime implements MessageHandler<unknown> {
     return false;
   }
 
-  async subscribeToDocumentNotifications(
-    args: { index: string; collection: string; scope: SubscriptionScopeInterest },
-    filters = {},
-    cb: (notification: unknown) => void,
-  ) {
-    const payload = {
-      ...args,
-      controller: "realtime",
-      action: "subscribe",
-      body: filters,
-      users: "none",
-    };
-
-    // Register callback for notifications.
-    return this.registerSubscriptionCallback(payload, cb);
-  }
-
-  async subscribeToPresenceNotifications(
-    args: { index: string; collection: string; users: SubscriptionUserInterest },
-    filters = {},
-    cb: (notification: unknown) => void,
-  ) {
-    const payload = {
-      ...args,
-      controller: "realtime",
-      action: "subscribe",
-      body: filters,
-      scope: "none", // No document in this callback.
-    };
-
-    // Register callback for notifications.
-    return this.registerSubscriptionCallback(payload, cb);
-  }
-
   /**
    * Restore any previous subscriptions in case of a reconnection.
    */
-  async restoreSubscriptions() {
-    if (this.subscriptionChannelPayloads.size <= 0) return console.log("No subscriptions to restore.");
+  restoreSubscriptions = async () => {
+    if (this.subscriptionChannelPayloads.size <= 0)
+      return console.log("No subscriptions to restore.");
 
     await Promise.all(
-      Array.from(this.subscriptionChannelPayloads).map(([channelID, requestPayload]) => {
-        console.log("Restoring subscriptions for room", channelID);
-        return this.requestHandler.sendRequest(requestPayload);
-      }),
+      Array.from(this.subscriptionChannelPayloads).map(
+        ([channelID, requestPayload]) => {
+          console.log("Restoring subscriptions for room", channelID);
+          return this.requestHandler.sendRequest(requestPayload);
+        }
+      )
     );
     console.log("Subscriptions restored.");
-  }
+  };
 
-  private async registerSubscriptionCallback(payload: object, cb: (notification: unknown) => void) {
-    const response = await this.requestHandler.sendRequest<SubscriptionResult>(payload);
+  private async registerSubscriptionCallback(
+    payload: object,
+    cb: (notification: unknown) => void
+  ) {
+    const response = await this.requestHandler.sendRequest<SubscriptionResult>(
+      payload
+    );
     const { roomId: roomID, channel: channelID } = response.result;
 
     // Add payload to restore subscriptions in case of a reconnection.
@@ -120,11 +164,16 @@ export class Realtime implements MessageHandler<unknown> {
       room.removeObserver(channelID, cb);
 
       // Remove handler for restoring subscriptions in case of a reconnection.
-      if (!room.hasRemainingInterestForChannel(channelID)) this.subscriptionChannelPayloads.delete(channelID);
+      if (!room.hasRemainingInterestForChannel(channelID))
+        this.subscriptionChannelPayloads.delete(channelID);
 
       // Unsubscribe from room if no more interest.
       if (!room.hasRemainingInterestForRoom()) {
-        console.log("Unsubscribing from room", roomID, "because no more interest.");
+        console.log(
+          "Unsubscribing from room",
+          roomID,
+          "because no more interest."
+        );
         return this.requestHandler.sendRequest({
           controller: "realtime",
           action: "unsubscribe",

@@ -1,5 +1,5 @@
 {
-  "name": "CustomSDK",
+  "name": "@codingspark/kuzzle-realtime-sdk",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -10,6 +10,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "nanoid": "^5.0.5",
     "partysocket": "^0.0.25"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16"
   }
 }
