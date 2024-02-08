@@ -237,14 +237,16 @@ var RequestHandler = class {
 var KuzzleRealtimeSDK = class {
   constructor(host, config) {
     this.config = config;
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const socket = new partysocket.WebSocket(
-      `${((_a = this.config) == null ? void 0 : _a.ssl) ? "wss" : "ws"}://${host}:${((_b = this.config) == null ? void 0 : _b.port) || 7512}`
+      `${((_a = this.config) == null ? void 0 : _a.ssl) ? "wss" : "ws"}://${host}:${((_b = this.config) == null ? void 0 : _b.port) || 7512}`,
+      (_c = config == null ? void 0 : config.webSocket) == null ? void 0 : _c.protocols,
+      (_d = config == null ? void 0 : config.webSocket) == null ? void 0 : _d.options
     );
-    if (((_c = process == null ? void 0 : process.versions) == null ? void 0 : _c.node) !== null)
+    if (((_e = process == null ? void 0 : process.versions) == null ? void 0 : _e.node) !== null)
       socket.binaryType = "arraybuffer";
     const pingHandler = new PingHandler(socket);
-    const requestHandler = new RequestHandler(socket, (_d = this.config) == null ? void 0 : _d.apiToken);
+    const requestHandler = new RequestHandler(socket, (_f = this.config) == null ? void 0 : _f.apiToken);
     const realtime = new Realtime(requestHandler);
     this.requestHandler = requestHandler.getPublicAPI();
     this.realtime = realtime.getPublicAPI();
