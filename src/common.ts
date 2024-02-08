@@ -1,7 +1,12 @@
+import type { Authentication } from "./controllers/Authentication";
 import { WebSocket } from "partysocket";
 
 export interface SDKConfig {
-  apiToken?: string;
+  /**
+   * An initial API Token to use for authentication or any JWT stored to avoid authentication.
+   * It will be overridden by any token returned by the in case of login or if you call {@link Authentication.logout} or {@link Authentication.login}
+   */
+  authToken?: string;
   debug?: boolean;
   port?: number;
   ssl?: boolean;
@@ -42,6 +47,7 @@ export type KuzzleNotificationMessage<T = unknown> = KuzzleMessage<T> & {
   action: string;
 };
 
+// TODO: can't be ephemeral when event : write / delete, and scope also not concerned for ephemeral.
 type CommonKuzzleDocumentNotification<Type, P = unknown> = {
   timestamp: number;
   type: Type;

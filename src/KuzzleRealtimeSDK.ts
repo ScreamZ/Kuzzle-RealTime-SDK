@@ -8,13 +8,18 @@ import { Collection } from "./controllers/Collection";
 import { Index } from "./controllers/Index";
 import { Document } from "./controllers/Document";
 import { Logger } from "./Logger";
+import { Authentication } from "./controllers/Authentication";
 
 export class KuzzleRealtimeSDK {
+  // Controllers
   readonly requestHandler: ReturnType<RequestHandler["getPublicAPI"]>;
   readonly realtime: ReturnType<Realtime["getPublicAPI"]>;
   readonly collection: Collection;
   readonly index: Index;
   readonly document: Document;
+  readonly auth: Authentication;
+
+  // Public methods
   readonly addEventListeners: (typeof WebSocket)["prototype"]["addEventListener"];
   readonly removeEventListeners: (typeof WebSocket)["prototype"]["removeEventListener"];
 
@@ -46,7 +51,7 @@ export class KuzzleRealtimeSDK {
     const pingHandler = new PingHandler(this.socket);
     const requestHandler = new RequestHandler(
       this.socket,
-      this.config?.apiToken
+      this.config?.authToken
     );
     const realtime = new Realtime(requestHandler, this.logger);
 
@@ -56,6 +61,7 @@ export class KuzzleRealtimeSDK {
     this.collection = new Collection(requestHandler);
     this.index = new Index(requestHandler);
     this.document = new Document(requestHandler);
+    this.auth = new Authentication(requestHandler);
 
     // Sockets
     this.socket.addEventListener("message", (rawMessage) => {

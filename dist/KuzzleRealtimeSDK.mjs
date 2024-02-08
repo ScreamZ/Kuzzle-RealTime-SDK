@@ -214,16 +214,17 @@ var Realtime = class {
   }
 };
 var RequestHandler = class {
-  constructor(socket, apiToken) {
+  constructor(socket, authToken) {
     this.socket = socket;
-    this.apiToken = apiToken;
+    this.authToken = authToken;
   }
   pendingRequests = /* @__PURE__ */ new Map();
   timeout = 5e3;
   volatile = {};
   getPublicAPI = () => ({
     sendRequest: this.sendRequest,
-    setVolatileData: this.setVolatileData
+    setVolatileData: this.setVolatileData,
+    setAuthToken: this.setAuthToken
   });
   handleMessage(message) {
     if (message.requestId !== message.room)
@@ -253,11 +254,14 @@ var RequestHandler = class {
         ...payload,
         requestId: id,
         volatile: this.volatile,
-        ...this.apiToken && { jwt: this.apiToken }
+        ...this.authToken && { jwt: this.authToken }
         // Add token if defined
       })
     );
   });
+  setAuthToken = (token) => {
+    this.authToken = token;
+  };
 };
 
 // src/Controller.ts
@@ -391,6 +395,54 @@ var Logger = class {
   }
 };
 
+// src/controllers/Authentication.ts
+var Authentication = class extends Controller {
+  getCurrentUser = async () => {
+    const res = await this.requestHandler.sendRequest({
+      controller: "auth",
+      action: "getCurrentUser"
+    });
+    return res.result;
+  };
+  /**
+   * Send login request to kuzzle with credentials
+   *
+   * @param strategy Name of the strategy to use
+   * @param credentials Credentials object for the strategy
+   * @param expiresIn Expiration time in ms library format. (e.g. "2h")
+   *
+   * @returns The encrypted JSON Web Token
+   */
+  login = async (strategy, credentials, expiresIn) => {
+    const res = await this.requestHandler.sendRequest({
+      controller: "auth",
+      action: "login",
+      body: credentials,
+      strategy,
+      expiresIn
+    });
+    if (res.result.jwt)
+      this.requestHandler.setAuthToken(res.result.jwt);
+    return res.result;
+  };
+  /**
+   * Revokes the provided authentication token if it's not an API key.
+   * If there were any, real-time subscriptions are cancelled.
+   *
+   * Also remove the token from the SDK instance.
+   *
+   * @param global if true, also revokes all other active sessions that aren't using an API key, instead of just the current one (default: false)
+   */
+  logout = async (global) => {
+    await this.requestHandler.sendRequest({
+      controller: "auth",
+      action: "logout",
+      global
+    });
+    this.requestHandler.setAuthToken(void 0);
+  };
+};
+
 // src/KuzzleRealtimeSDK.ts
 var KuzzleRealtimeSDK = class {
   constructor(host, config) {
@@ -411,7 +463,7 @@ var KuzzleRealtimeSDK = class {
     const pingHandler = new PingHandler(this.socket);
     const requestHandler = new RequestHandler(
       this.socket,
-      (_f = this.config) == null ? void 0 : _f.apiToken
+      (_f = this.config) == null ? void 0 : _f.authToken
     );
     const realtime = new Realtime(requestHandler, this.logger);
     this.requestHandler = requestHandler.getPublicAPI();
@@ -419,6 +471,7 @@ var KuzzleRealtimeSDK = class {
     this.collection = new Collection(requestHandler);
     this.index = new Index(requestHandler);
     this.document = new Document(requestHandler);
+    this.auth = new Authentication(requestHandler);
     this.socket.addEventListener("message", (rawMessage) => {
       const message = JSON.parse(
         rawMessage.data || rawMessage
@@ -443,11 +496,14 @@ var KuzzleRealtimeSDK = class {
       this.logger.log("SDK - Socket error", event);
     });
   }
+  // Controllers
   requestHandler;
   realtime;
   collection;
   index;
   document;
+  auth;
+  // Public methods
   addEventListeners;
   removeEventListeners;
   get isConnected() {

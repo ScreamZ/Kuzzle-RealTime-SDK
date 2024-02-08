@@ -1,7 +1,11 @@
 import { WebSocket } from 'partysocket';
 
 interface SDKConfig {
-    apiToken?: string;
+    /**
+     * An initial API Token to use for authentication or any JWT stored to avoid authentication.
+     * It will be overridden by any token returned by the in case of login or if you call {@link Authentication.logout} or {@link Authentication.login}
+     */
+    authToken?: string;
     debug?: boolean;
     port?: number;
     ssl?: boolean;
@@ -66,18 +70,20 @@ declare class Logger {
 
 declare class RequestHandler implements MessageHandler<unknown> {
     private socket;
-    private apiToken?;
+    private authToken?;
     private readonly pendingRequests;
     private readonly timeout;
     private volatile;
-    constructor(socket: WebSocket, apiToken?: string | undefined);
+    constructor(socket: WebSocket, authToken?: string | undefined);
     getPublicAPI: () => {
         sendRequest: <Result>(payload: object) => Promise<KuzzleMessage<Result>>;
         setVolatileData: (data: Record<string, unknown>) => void;
+        setAuthToken: (token?: string) => void;
     };
     handleMessage(message: KuzzleMessage<unknown>): boolean;
     setVolatileData: (data: Record<string, unknown>) => void;
     sendRequest: <Result>(payload: object) => Promise<KuzzleMessage<Result>>;
+    setAuthToken: (token?: string) => void;
 }
 
 type DocumentSubscriptionArgs = {
@@ -196,6 +202,42 @@ type SearchResult<T> = {
     remaining?: number;
 };
 
+declare class Authentication extends Controller {
+    getCurrentUser: <T>() => Promise<GetCurrentUserResult<T>>;
+    /**
+     * Send login request to kuzzle with credentials
+     *
+     * @param strategy Name of the strategy to use
+     * @param credentials Credentials object for the strategy
+     * @param expiresIn Expiration time in ms library format. (e.g. "2h")
+     *
+     * @returns The encrypted JSON Web Token
+     */
+    login: (strategy: string, credentials: Record<string, unknown>, expiresIn?: string | number) => Promise<GetLoginResult>;
+    /**
+     * Revokes the provided authentication token if it's not an API key.
+     * If there were any, real-time subscriptions are cancelled.
+     *
+     * Also remove the token from the SDK instance.
+     *
+     * @param global if true, also revokes all other active sessions that aren't using an API key, instead of just the current one (default: false)
+     */
+    logout: (global?: boolean) => Promise<void>;
+}
+type GetLoginResult = {
+    _id: string;
+    jwt: string;
+    expiresAt: number;
+    ttl: number;
+};
+type GetCurrentUserResult<T> = {
+    _id: string;
+    strategies: string[];
+    _source: {
+        profileIds: string[];
+    } & T;
+};
+
 declare class KuzzleRealtimeSDK {
     private config?;
     readonly requestHandler: ReturnType<RequestHandler["getPublicAPI"]>;
@@ -203,6 +245,7 @@ declare class KuzzleRealtimeSDK {
     readonly collection: Collection;
     readonly index: Index;
     readonly document: Document;
+    readonly auth: Authentication;
     readonly addEventListeners: (typeof WebSocket)["prototype"]["addEventListener"];
     readonly removeEventListeners: (typeof WebSocket)["prototype"]["removeEventListener"];
     get isConnected(): boolean;
