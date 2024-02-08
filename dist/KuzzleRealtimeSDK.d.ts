@@ -53,12 +53,12 @@ declare class RequestHandler implements MessageHandler<unknown> {
     private volatile;
     constructor(socket: WebSocket, apiToken?: string | undefined);
     getPublicAPI: () => {
-        sendRequest: <Result extends object>(payload: object) => Promise<KuzzleMessage<Result>>;
+        sendRequest: <Result>(payload: object) => Promise<KuzzleMessage<Result>>;
         setVolatileData: (data: Record<string, unknown>) => void;
     };
     handleMessage(message: KuzzleMessage<unknown>): boolean;
     setVolatileData: (data: Record<string, unknown>) => void;
-    sendRequest: <Result extends object>(payload: object) => Promise<KuzzleMessage<Result>>;
+    sendRequest: <Result>(payload: object) => Promise<KuzzleMessage<Result>>;
 }
 
 declare class Realtime implements MessageHandler<unknown> {
@@ -79,7 +79,7 @@ declare class Realtime implements MessageHandler<unknown> {
         index: string;
         collection: string;
         scope: SubscriptionScopeInterest;
-    }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<object>> | undefined>;
+    }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<unknown>> | undefined>;
     /**
      * Subscribe to presence notification, when user enter/leave same room.
      *
@@ -90,7 +90,7 @@ declare class Realtime implements MessageHandler<unknown> {
         index: string;
         collection: string;
         users: SubscriptionUserInterest;
-    }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<object>> | undefined>;
+    }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<unknown>> | undefined>;
     /**
      * Send ephemeral notification. This is a one-time notification, not persisted in storage.
      *
@@ -99,22 +99,22 @@ declare class Realtime implements MessageHandler<unknown> {
     sendEphemeralNotification: (args: {
         index: string;
         collection: string;
-    }, payload: object) => Promise<KuzzleMessage<object>>;
+    }, payload: object) => Promise<KuzzleMessage<unknown>>;
     getPublicAPI: () => {
         subscribeToDocumentNotifications: <T extends Object>(args: {
             index: string;
             collection: string;
             scope: SubscriptionScopeInterest;
-        }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<object>> | undefined>;
+        }, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<() => Promise<KuzzleMessage<unknown>> | undefined>;
         subscribeToPresenceNotifications: (args: {
             index: string;
             collection: string;
             users: SubscriptionUserInterest;
-        }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<object>> | undefined>;
+        }, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<() => Promise<KuzzleMessage<unknown>> | undefined>;
         sendEphemeralNotification: (args: {
             index: string;
             collection: string;
-        }, payload: object) => Promise<KuzzleMessage<object>>;
+        }, payload: object) => Promise<KuzzleMessage<unknown>>;
     };
     handleMessage(data: KuzzleMessage): boolean;
     /**
@@ -124,11 +124,37 @@ declare class Realtime implements MessageHandler<unknown> {
     private registerSubscriptionCallback;
 }
 
+declare class Controller {
+    protected requestHandler: RequestHandler;
+    constructor(requestHandler: RequestHandler);
+}
+
+declare class Collection extends Controller {
+    exists: (index: string, collection: string) => Promise<boolean>;
+    create: (index: string, collection: string, mapping?: object) => Promise<boolean>;
+}
+
+declare class Index extends Controller {
+    exists: (index: string) => Promise<boolean>;
+    create: (index: string) => Promise<boolean>;
+}
+
+declare class Document extends Controller {
+    create: (index: string, collection: string, body: object, id?: string) => Promise<boolean>;
+    get: (index: string, collection: string, id: string) => Promise<object>;
+}
+
 declare class KuzzleRealtimeSDK {
     private config?;
     readonly requestHandler: ReturnType<RequestHandler["getPublicAPI"]>;
     readonly realtime: ReturnType<Realtime["getPublicAPI"]>;
+    readonly collection: Collection;
+    readonly index: Index;
+    readonly document: Document;
+    get isConnected(): boolean;
+    private readonly socket;
     constructor(host: string, config?: SDKConfig | undefined);
+    disconnect(): void;
 }
 
 export { KuzzleRealtimeSDK };

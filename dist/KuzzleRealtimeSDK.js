@@ -256,24 +256,105 @@ var RequestHandler = class {
   });
 };
 
+// src/Controller.ts
+var Controller = class {
+  constructor(requestHandler) {
+    this.requestHandler = requestHandler;
+  }
+};
+
+// src/controllers/Collection.ts
+var Collection = class extends Controller {
+  exists = async (index, collection) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "collection",
+      action: "exists",
+      index,
+      collection
+    });
+    return response.result;
+  };
+  create = async (index, collection, mapping) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "collection",
+      action: "create",
+      index,
+      collection,
+      body: mapping
+    });
+    return response.result;
+  };
+};
+
+// src/controllers/Index.ts
+var Index = class extends Controller {
+  exists = async (index) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "index",
+      action: "exists",
+      index
+    });
+    return response.result;
+  };
+  create = async (index) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "index",
+      action: "create",
+      index
+    });
+    return response.result;
+  };
+};
+
+// src/controllers/Document.ts
+var Document = class extends Controller {
+  create = async (index, collection, body, id) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "document",
+      action: "create",
+      index,
+      collection,
+      _id: id,
+      body
+    });
+    return response.result;
+  };
+  get = async (index, collection, id) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "document",
+      action: "get",
+      index,
+      collection,
+      _id: id
+    });
+    return response.result;
+  };
+};
+
 // src/KuzzleRealtimeSDK.ts
 var KuzzleRealtimeSDK = class {
   constructor(host, config) {
     this.config = config;
     var _a, _b, _c, _d, _e, _f;
-    const socket = new partysocket.WebSocket(
+    this.socket = new partysocket.WebSocket(
       `${((_a = this.config) == null ? void 0 : _a.ssl) ? "wss" : "ws"}://${host}:${((_b = this.config) == null ? void 0 : _b.port) || 7512}`,
       (_c = config == null ? void 0 : config.webSocket) == null ? void 0 : _c.protocols,
       (_d = config == null ? void 0 : config.webSocket) == null ? void 0 : _d.options
     );
     if (((_e = process == null ? void 0 : process.versions) == null ? void 0 : _e.node) !== null)
-      socket.binaryType = "arraybuffer";
-    const pingHandler = new PingHandler(socket);
-    const requestHandler = new RequestHandler(socket, (_f = this.config) == null ? void 0 : _f.apiToken);
+      this.socket.binaryType = "arraybuffer";
+    const pingHandler = new PingHandler(this.socket);
+    const requestHandler = new RequestHandler(
+      this.socket,
+      (_f = this.config) == null ? void 0 : _f.apiToken
+    );
     const realtime = new Realtime(requestHandler);
     this.requestHandler = requestHandler.getPublicAPI();
     this.realtime = realtime.getPublicAPI();
-    socket.addEventListener("message", (rawMessage) => {
+    this.collection = new Collection(requestHandler);
+    this.index = new Index(requestHandler);
+    this.document = new Document(requestHandler);
+    this.socket.addEventListener("message", (rawMessage) => {
       const message = JSON.parse(
         rawMessage.data || rawMessage
       );
@@ -284,21 +365,31 @@ var KuzzleRealtimeSDK = class {
       if (realtime.handleMessage(message))
         return;
     });
-    socket.addEventListener("open", async () => {
+    this.socket.addEventListener("open", async () => {
       console.log("SDK - Socket opened to Kuzzle");
       pingHandler.initPing();
       await realtime.restoreSubscriptions();
     });
-    socket.addEventListener("close", (event) => {
+    this.socket.addEventListener("close", (event) => {
       console.log(`SDK - Socket from Kuzzle closed [${event.reason}]`);
       pingHandler.stopPing();
     });
-    socket.addEventListener("error", (event) => {
+    this.socket.addEventListener("error", (event) => {
       console.log("SDK - Socket error", event);
     });
   }
   requestHandler;
   realtime;
+  collection;
+  index;
+  document;
+  get isConnected() {
+    return this.socket.readyState === this.socket.OPEN;
+  }
+  socket;
+  disconnect() {
+    this.socket.close();
+  }
 };
 
 exports.KuzzleRealtimeSDK = KuzzleRealtimeSDK;
