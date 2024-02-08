@@ -47,7 +47,10 @@ export class RequestHandler implements MessageHandler<unknown> {
       // Add handler and timeout clearer.
       this.pendingRequests.set(id, (responsePayload) => {
         clearTimeout(timeoutRef);
-        resolve(responsePayload as KuzzleMessage<Result>);
+
+        return responsePayload.error
+          ? reject(responsePayload.error)
+          : resolve(responsePayload as KuzzleMessage<Result>);
       });
 
       // Send request

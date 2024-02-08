@@ -248,7 +248,7 @@ var RequestHandler = class {
     );
     this.pendingRequests.set(id, (responsePayload) => {
       clearTimeout(timeoutRef);
-      resolve(responsePayload);
+      return responsePayload.error ? reject(responsePayload.error) : resolve(responsePayload);
     });
     this.socket.send(
       JSON.stringify({
