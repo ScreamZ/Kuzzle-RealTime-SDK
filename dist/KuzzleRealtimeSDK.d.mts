@@ -32,11 +32,14 @@ declare class RequestHandler implements MessageHandler<unknown> {
     private apiToken?;
     private readonly pendingRequests;
     private readonly timeout;
+    private volatile;
     constructor(socket: WebSocket, apiToken?: string | undefined);
     getPublicAPI: () => {
         sendRequest: <Result extends object>(payload: object) => Promise<KuzzleMessage<Result>>;
+        setVolatileData: (data: Record<string, unknown>) => void;
     };
     handleMessage(message: KuzzleMessage<unknown>): boolean;
+    setVolatileData: (data: Record<string, unknown>) => void;
     sendRequest: <Result extends object>(payload: object) => Promise<KuzzleMessage<Result>>;
 }
 

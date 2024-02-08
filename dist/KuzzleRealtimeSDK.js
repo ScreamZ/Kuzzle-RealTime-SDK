@@ -201,8 +201,10 @@ var RequestHandler = class {
   }
   pendingRequests = /* @__PURE__ */ new Map();
   timeout = 5e3;
+  volatile = {};
   getPublicAPI = () => ({
-    sendRequest: this.sendRequest
+    sendRequest: this.sendRequest,
+    setVolatileData: this.setVolatileData
   });
   handleMessage(message) {
     const matchingRequestResolver = this.pendingRequests.get(message.requestId);
@@ -212,6 +214,9 @@ var RequestHandler = class {
     this.pendingRequests.delete(message.requestId);
     return true;
   }
+  setVolatileData = (data) => {
+    this.volatile = data;
+  };
   sendRequest = (payload) => new Promise((resolve, reject) => {
     const id = nanoid.nanoid();
     const timeoutRef = setTimeout(
@@ -226,6 +231,7 @@ var RequestHandler = class {
       JSON.stringify({
         ...payload,
         requestId: id,
+        volatile: this.volatile,
         ...this.apiToken && { jwt: this.apiToken }
         // Add token if defined
       })

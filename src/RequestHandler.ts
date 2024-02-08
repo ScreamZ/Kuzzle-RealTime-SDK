@@ -8,11 +8,13 @@ type RequestHandlerFn = (response: KuzzleMessage<unknown>) => void;
 export class RequestHandler implements MessageHandler<unknown> {
   private readonly pendingRequests = new Map<string, RequestHandlerFn>();
   private readonly timeout = 5000;
+  private volatile: Record<string, unknown> = {};
 
   constructor(private socket: WebSocket, private apiToken?: string) {}
 
   getPublicAPI = () => ({
     sendRequest: this.sendRequest,
+    setVolatileData: this.setVolatileData,
   });
 
   public handleMessage(message: KuzzleMessage<unknown>): boolean {
@@ -24,6 +26,10 @@ export class RequestHandler implements MessageHandler<unknown> {
     this.pendingRequests.delete(message.requestId);
     return true;
   }
+
+  setVolatileData = (data: Record<string, unknown>) => {
+    this.volatile = data;
+  };
 
   public sendRequest = <Result extends object>(payload: object) =>
     new Promise<KuzzleMessage<Result>>((resolve, reject) => {
@@ -46,6 +52,7 @@ export class RequestHandler implements MessageHandler<unknown> {
         JSON.stringify({
           ...payload,
           requestId: id,
+          volatile: this.volatile,
           ...(this.apiToken && { jwt: this.apiToken }), // Add token if defined
         })
       );
