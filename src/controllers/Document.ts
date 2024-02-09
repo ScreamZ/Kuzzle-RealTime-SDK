@@ -80,6 +80,26 @@ export class Document extends Controller {
     return response.result._id;
   };
 
+  deleteByQuery = async <T extends object>(
+    index: string,
+    collection: string,
+    query = {},
+    options: DeleteByQueryOpts = {}
+  ) => {
+    const response = await this.requestHandler.sendRequest<
+      DeleteByQueryResult<T>
+    >({
+      controller: "document",
+      action: "deleteByQuery",
+      index,
+      collection,
+      body: { query },
+      ...options,
+    });
+
+    return response.result.documents;
+  };
+
   search = async <T extends object = object>(
     index: string,
     collection: string,
@@ -127,4 +147,14 @@ type SearchResult<T> = {
   scrollId?: string;
   aggregations?: object;
   remaining?: number;
+};
+
+type DeleteByQueryResult<T extends object> = {
+  documents: Array<{ _id: string; source?: T }>;
+};
+
+type DeleteByQueryOpts = {
+  silent?: boolean;
+  lang?: "elasticsearch" | "koncorde";
+  source?: boolean;
 };

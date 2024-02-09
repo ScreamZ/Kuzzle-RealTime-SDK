@@ -370,6 +370,17 @@ var Document = class extends Controller {
     });
     return response.result._id;
   };
+  deleteByQuery = async (index, collection, query = {}, options = {}) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "document",
+      action: "deleteByQuery",
+      index,
+      collection,
+      body: { query },
+      ...options
+    });
+    return response.result.documents;
+  };
   search = async (index, collection, body, options = {}) => {
     const response = await this.requestHandler.sendRequest({
       controller: "document",

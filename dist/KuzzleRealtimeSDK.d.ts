@@ -172,6 +172,10 @@ declare class Document extends Controller {
     }>;
     exists: (index: string, collection: string, id: string) => Promise<boolean>;
     delete: (index: string, collection: string, id: string) => Promise<string>;
+    deleteByQuery: <T extends object>(index: string, collection: string, query?: {}, options?: DeleteByQueryOpts) => Promise<{
+        _id: string;
+        source?: T | undefined;
+    }[]>;
     search: <T extends object = object>(index: string, collection: string, body: SearchBody, options?: SearchOptions) => Promise<SearchResult<T>>;
 }
 type SearchBody = {
@@ -200,6 +204,11 @@ type SearchResult<T> = {
     scrollId?: string;
     aggregations?: object;
     remaining?: number;
+};
+type DeleteByQueryOpts = {
+    silent?: boolean;
+    lang?: "elasticsearch" | "koncorde";
+    source?: boolean;
 };
 
 declare class Authentication extends Controller {
