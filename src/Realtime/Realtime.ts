@@ -128,6 +128,13 @@ export class Realtime implements MessageHandler<unknown> {
     const matchingSubscriptionRoom = roomID ? this.roomsMap.get(roomID) : null;
 
     if (channelID && matchingSubscriptionRoom) {
+      this.logger.log(
+        "Received notification for room",
+        roomID,
+        "channel",
+        channelID,
+        JSON.stringify(data)
+      );
       matchingSubscriptionRoom.notifyChannel(
         channelID,
         data as KuzzleNotificationMessage<any>
