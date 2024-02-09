@@ -37,6 +37,16 @@ type KuzzleMessage<Result = unknown> = {
         status: number;
     } | null;
 };
+type KuzzlePresenceNotification<T extends object = {}> = {
+    volatile: T;
+    /**
+     * - in: User entered the room.
+     * - out: User left the room.
+     */
+    scope: "in" | "out";
+    current_users_in_room: number;
+    timestamp: number;
+};
 type CommonKuzzleDocumentNotification<Type, P = unknown> = {
     timestamp: number;
     type: Type;
@@ -118,7 +128,7 @@ declare class Realtime implements MessageHandler<unknown> {
      * @param filters Koncorde filters
      * @param cb Called when a notification is received and match filter
      */
-    subscribeToPresenceNotifications: (args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<UnsubscribeFn>;
+    subscribeToPresenceNotifications: <T extends object>(args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzlePresenceNotification<T>) => void) => Promise<UnsubscribeFn>;
     /**
      * Send ephemeral notification. This is a one-time notification, not persisted in storage.
      *
@@ -130,7 +140,7 @@ declare class Realtime implements MessageHandler<unknown> {
     }, payload: object) => Promise<KuzzleMessage<unknown>>;
     getPublicAPI: () => {
         subscribeToDocumentNotifications: <T extends Object>(args: DocumentSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<UnsubscribeFn>;
-        subscribeToPresenceNotifications: (args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: unknown) => void) => Promise<UnsubscribeFn>;
+        subscribeToPresenceNotifications: <T_1 extends object>(args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzlePresenceNotification<T_1>) => void) => Promise<UnsubscribeFn>;
         sendEphemeralNotification: (args: {
             index: string;
             collection: string;

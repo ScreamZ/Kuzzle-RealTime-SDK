@@ -41,10 +41,24 @@ export type KuzzleMessage<Result = unknown> = {
 };
 
 export type KuzzleNotificationMessage<T = unknown> = KuzzleMessage<T> & {
-  scope: "in" | "out";
+  scope?: "in" | "out";
+  user?: "in" | "out";
   timestamp: number;
+  type: "user" | "document" | "TokenExpired";
   event: "write" | "delete" | "publish";
+  volatile: object;
   action: string;
+};
+
+export type KuzzlePresenceNotification<T extends object = {}> = {
+  volatile: T;
+  /**
+   * - in: User entered the room.
+   * - out: User left the room.
+   */
+  scope: "in" | "out";
+  current_users_in_room: number;
+  timestamp: number;
 };
 
 // TODO: can't be ephemeral when event : write / delete, and scope also not concerned for ephemeral.
@@ -75,7 +89,7 @@ export type KuzzleDocumentNotification<T = unknown> =
     >;
 
 export type NotificationCallback = (
-  notification: KuzzleDocumentNotification
+  notification: KuzzleDocumentNotification | KuzzlePresenceNotification
 ) => void;
 
 export type KuzzlePingMessage = { p: 1 | 2 };

@@ -2,6 +2,7 @@ import {
   KuzzleDocumentNotification,
   KuzzleMessage,
   KuzzleNotificationMessage,
+  KuzzlePresenceNotification,
   MessageHandler,
   NotificationCallback,
   SubscriptionScopeInterest,
@@ -76,10 +77,10 @@ export class Realtime implements MessageHandler<unknown> {
    * @param filters Koncorde filters
    * @param cb Called when a notification is received and match filter
    */
-  public subscribeToPresenceNotifications = (
+  public subscribeToPresenceNotifications = <T extends object>(
     args: PresenceSubscriptionArgs,
     filters = {},
-    cb: (notification: unknown) => void
+    cb: (notification: KuzzlePresenceNotification<T>) => void
   ): Promise<UnsubscribeFn> => {
     const payload = {
       ...args,
@@ -90,7 +91,10 @@ export class Realtime implements MessageHandler<unknown> {
     };
 
     // Register callback for notifications.
-    return this.registerSubscriptionCallback(payload, cb);
+    return this.registerSubscriptionCallback(
+      payload,
+      cb as NotificationCallback
+    );
   };
 
   /**

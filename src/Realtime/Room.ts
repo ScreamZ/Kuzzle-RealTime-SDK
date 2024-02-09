@@ -1,6 +1,7 @@
 import {
   KuzzleDocumentNotification,
   KuzzleNotificationMessage,
+  KuzzlePresenceNotification,
   NotificationCallback,
 } from "../common";
 
@@ -11,20 +12,41 @@ export class Room {
 
   notifyChannel(
     channel: string,
-    message: KuzzleNotificationMessage<{ _id: string; _source: unknown }>
+    message: KuzzleNotificationMessage<{
+      _id: string;
+      _source: unknown;
+      count?: number;
+    }>
   ) {
     // We just skip silently because this only happens if the at some point the user subscribed to a channel like presence notification, or document notification and then unsubscribed from it. Resulting in a notification being sent to a channel that is not registered anymore. And kuzzle only allows to unsubscribe from a room, not from a channel. {@link https://docs.kuzzle.io/core/2/api/controllers/realtime/unsubscribe/}
     if (!this.channelsMap.has(channel)) return;
 
-    const mapped: KuzzleDocumentNotification = {
-      scope: message.scope,
-      payload: message.result,
-      timestamp: message.timestamp,
-      event: message.event,
-      type: message.event === "publish" ? "ephemeral" : "document",
-    };
-
-    this.channelsMap.get(channel)!.forEach((notify) => notify(mapped));
+    switch (message.type) {
+      case "TokenExpired":
+        //TODO: Handled in AuthenticationHandler, we should not receive this.
+        // OR TODO handle it here.
+        break;
+      case "document": {
+        const mapped: KuzzleDocumentNotification = {
+          scope: message.scope!,
+          payload: message.result,
+          timestamp: message.timestamp,
+          event: message.event,
+          type: message.event === "publish" ? "ephemeral" : "document",
+        };
+        this.channelsMap.get(channel)!.forEach((notify) => notify(mapped));
+        break;
+      }
+      case "user": {
+        const mapped: KuzzlePresenceNotification = {
+          current_users_in_room: message.result.count!,
+          scope: message.user!,
+          timestamp: message.timestamp,
+          volatile: message.volatile,
+        };
+        this.channelsMap.get(channel)!.forEach((notify) => notify(mapped));
+      }
+    }
   }
 
   infos() {

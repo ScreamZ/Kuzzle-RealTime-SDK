@@ -38,14 +38,30 @@ var Room = class {
   notifyChannel(channel, message) {
     if (!this.channelsMap.has(channel))
       return;
-    const mapped = {
-      scope: message.scope,
-      payload: message.result,
-      timestamp: message.timestamp,
-      event: message.event,
-      type: message.event === "publish" ? "ephemeral" : "document"
-    };
-    this.channelsMap.get(channel).forEach((notify) => notify(mapped));
+    switch (message.type) {
+      case "TokenExpired":
+        break;
+      case "document": {
+        const mapped = {
+          scope: message.scope,
+          payload: message.result,
+          timestamp: message.timestamp,
+          event: message.event,
+          type: message.event === "publish" ? "ephemeral" : "document"
+        };
+        this.channelsMap.get(channel).forEach((notify) => notify(mapped));
+        break;
+      }
+      case "user": {
+        const mapped = {
+          current_users_in_room: message.result.count,
+          scope: message.user,
+          timestamp: message.timestamp,
+          volatile: message.volatile
+        };
+        this.channelsMap.get(channel).forEach((notify) => notify(mapped));
+      }
+    }
   }
   infos() {
     return {
@@ -130,7 +146,10 @@ var Realtime = class {
       scope: "none"
       // No document in this callback.
     };
-    return this.registerSubscriptionCallback(payload, cb);
+    return this.registerSubscriptionCallback(
+      payload,
+      cb
+    );
   };
   /**
    * Send ephemeral notification. This is a one-time notification, not persisted in storage.
