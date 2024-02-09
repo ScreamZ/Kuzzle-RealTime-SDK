@@ -19,6 +19,24 @@ export class Document extends Controller {
     return response.result;
   };
 
+  mCreate = async <T extends object>(
+    index: string,
+    collection: string,
+    documents: Array<{ _id?: string; body: T }>,
+    options: mCreateOpts = {}
+  ) => {
+    const response = await this.requestHandler.sendRequest<mCreateResult<T>>({
+      controller: "document",
+      action: "mCreate",
+      index,
+      collection,
+      body: { documents },
+      ...options,
+    });
+
+    return response.result;
+  };
+
   update = async <T extends object>(
     index: string,
     collection: string,
@@ -158,3 +176,60 @@ type DeleteByQueryOpts = {
   lang?: "elasticsearch" | "koncorde";
   source?: boolean;
 };
+
+type mCreateOpts = {
+  silent?: boolean;
+  strict?: boolean;
+};
+
+export type mCreateResult<T extends object> = {
+  /**
+   * Array of succeeded operations
+   */
+  successes: Array<{
+    /**
+     * Document unique identifier
+     */
+    _id: string;
+
+    /**
+     * Document content
+     */
+    _source: T;
+
+    /**
+     * Document version number
+     */
+    _version: number;
+
+    /**
+     * `true` if document is created
+     */
+    created: boolean;
+  }>;
+
+  /**
+   * Arrays of errored operations
+   */
+  errors: mResponseErrors<T>;
+};
+
+type mResponseErrors<T extends object> = Array<{
+  /**
+   * Original document that caused the error
+   */
+  document: {
+    _id: string;
+    _source: T;
+  };
+
+  /**
+   * HTTP error status code
+   */
+  status: number;
+
+  /**
+   * Human readable reason
+   */
+  reason: string;
+}>;

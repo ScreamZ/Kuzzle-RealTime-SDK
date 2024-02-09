@@ -165,6 +165,10 @@ declare class Index extends Controller {
 
 declare class Document extends Controller {
     create: <T extends object>(index: string, collection: string, body: T, id?: string) => Promise<boolean>;
+    mCreate: <T extends object>(index: string, collection: string, documents: {
+        _id?: string | undefined;
+        body: T;
+    }[], options?: mCreateOpts) => Promise<mCreateResult<T>>;
     update: <T extends object>(index: string, collection: string, id: string, body: Partial<T>) => Promise<boolean>;
     get: <T extends object = object>(index: string, collection: string, id: string) => Promise<{
         _id: string;
@@ -210,6 +214,54 @@ type DeleteByQueryOpts = {
     lang?: "elasticsearch" | "koncorde";
     source?: boolean;
 };
+type mCreateOpts = {
+    silent?: boolean;
+    strict?: boolean;
+};
+type mCreateResult<T extends object> = {
+    /**
+     * Array of succeeded operations
+     */
+    successes: Array<{
+        /**
+         * Document unique identifier
+         */
+        _id: string;
+        /**
+         * Document content
+         */
+        _source: T;
+        /**
+         * Document version number
+         */
+        _version: number;
+        /**
+         * `true` if document is created
+         */
+        created: boolean;
+    }>;
+    /**
+     * Arrays of errored operations
+     */
+    errors: mResponseErrors<T>;
+};
+type mResponseErrors<T extends object> = Array<{
+    /**
+     * Original document that caused the error
+     */
+    document: {
+        _id: string;
+        _source: T;
+    };
+    /**
+     * HTTP error status code
+     */
+    status: number;
+    /**
+     * Human readable reason
+     */
+    reason: string;
+}>;
 
 declare class Authentication extends Controller {
     getCurrentUser: <T>() => Promise<GetCurrentUserResult<T>>;

@@ -327,6 +327,17 @@ var Document = class extends Controller {
     });
     return response.result;
   };
+  mCreate = async (index, collection, documents, options = {}) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "document",
+      action: "mCreate",
+      index,
+      collection,
+      body: { documents },
+      ...options
+    });
+    return response.result;
+  };
   update = async (index, collection, id, body) => {
     const response = await this.requestHandler.sendRequest({
       controller: "document",
