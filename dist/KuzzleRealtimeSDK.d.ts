@@ -181,8 +181,8 @@ declare class Document extends Controller {
         _id?: string | undefined;
         body: T;
     }[], options?: mCreateOpts) => Promise<mCreateResult<T>>;
-    update: <T extends object, Opts extends UpdateUpsertOpts>(index: string, collection: string, id: string, body: Partial<T>, opts?: Opts | undefined) => Promise<UpdateUpsertResult<T, Opts>>;
-    upsert: <T extends object, Opts extends UpdateUpsertOpts>(index: string, collection: string, _id: string, body: {
+    update: <T extends object, Opts extends UpdateUpsertOpts = UpdateUpsertOpts>(index: string, collection: string, id: string, body: Partial<T>, opts?: Opts | undefined) => Promise<UpdateUpsertResult<T, Opts>>;
+    upsert: <T extends object, Opts extends UpdateUpsertOpts = UpdateUpsertOpts>(index: string, collection: string, _id: string, body: {
         changes: Partial<T>;
         default?: Partial<T> | undefined;
     }, opts?: Opts | undefined) => Promise<UpdateUpsertResult<T, Opts>>;
@@ -192,7 +192,7 @@ declare class Document extends Controller {
     }>;
     exists: (index: string, collection: string, id: string) => Promise<boolean>;
     delete: (index: string, collection: string, id: string) => Promise<string>;
-    deleteByQuery: <T extends object, Opts extends DeleteByQueryOpts>(index: string, collection: string, query?: {}, options?: Opts | undefined) => Promise<({
+    deleteByQuery: <T extends object, Opts extends DeleteByQueryOpts = DeleteByQueryOpts>(index: string, collection: string, query?: {}, options?: Opts | undefined) => Promise<({
         _id: string;
     } & (Opts["source"] extends true ? {
         source: T;

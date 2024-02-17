@@ -37,7 +37,10 @@ export class Document extends Controller {
     return response.result;
   };
 
-  update = async <T extends object, Opts extends UpdateUpsertOpts>(
+  update = async <
+    T extends object,
+    Opts extends UpdateUpsertOpts = UpdateUpsertOpts
+  >(
     index: string,
     collection: string,
     id: string,
@@ -59,7 +62,10 @@ export class Document extends Controller {
     return response.result;
   };
 
-  upsert = async <T extends object, Opts extends UpdateUpsertOpts>(
+  upsert = async <
+    T extends object,
+    Opts extends UpdateUpsertOpts = UpdateUpsertOpts
+  >(
     index: string,
     collection: string,
     _id: string,
@@ -124,7 +130,10 @@ export class Document extends Controller {
     return response.result._id;
   };
 
-  deleteByQuery = async <T extends object, Opts extends DeleteByQueryOpts>(
+  deleteByQuery = async <
+    T extends object,
+    Opts extends DeleteByQueryOpts = DeleteByQueryOpts
+  >(
     index: string,
     collection: string,
     query = {},
