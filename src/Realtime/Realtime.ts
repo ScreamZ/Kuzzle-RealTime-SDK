@@ -10,7 +10,7 @@ import {
 } from "../common";
 import { Logger } from "../Logger";
 import { RequestHandler } from "../handlers/RequestHandler";
-import { Room } from "./Room";
+import { ChannelInterest, Room } from "./Room";
 
 type SubscriptionResult = {
   /**
@@ -43,7 +43,11 @@ export class Realtime implements MessageHandler<unknown> {
    */
   private readonly subscriptionChannelPayloads = new Map<string, object>();
 
-  constructor(private requestHandler: RequestHandler, private logger: Logger) {}
+  constructor(
+    private requestHandler: RequestHandler,
+    private readonly sdkInstanceId: string,
+    private logger: Logger
+  ) {}
 
   /**
    * Subscribe to document notifications. Those could be ephemeral or persistent.
@@ -54,7 +58,8 @@ export class Realtime implements MessageHandler<unknown> {
   public subscribeToDocumentNotifications = <T extends Object>(
     args: DocumentSubscriptionArgs,
     filters = {},
-    cb: (notification: KuzzleDocumentNotification<T>) => void
+    cb: (notification: KuzzleDocumentNotification<T>) => void,
+    interestInSelfNotifications = true
   ): Promise<UnsubscribeFn> => {
     const payload = {
       ...args,
@@ -67,7 +72,8 @@ export class Realtime implements MessageHandler<unknown> {
     // Register callback for notifications.
     return this.registerSubscriptionCallback(
       payload,
-      cb as NotificationCallback
+      cb as NotificationCallback,
+      interestInSelfNotifications
     );
   };
 
@@ -80,7 +86,8 @@ export class Realtime implements MessageHandler<unknown> {
   public subscribeToPresenceNotifications = <T extends object>(
     args: PresenceSubscriptionArgs,
     filters = {},
-    cb: (notification: KuzzlePresenceNotification<T>) => void
+    cb: (notification: KuzzlePresenceNotification<T>) => void,
+    interestInSelfNotifications = true
   ): Promise<UnsubscribeFn> => {
     const payload = {
       ...args,
@@ -93,7 +100,8 @@ export class Realtime implements MessageHandler<unknown> {
     // Register callback for notifications.
     return this.registerSubscriptionCallback(
       payload,
-      cb as NotificationCallback
+      cb as NotificationCallback,
+      interestInSelfNotifications
     );
   };
 
@@ -164,7 +172,8 @@ export class Realtime implements MessageHandler<unknown> {
 
   private async registerSubscriptionCallback(
     payload: object,
-    cb: NotificationCallback
+    cb: NotificationCallback,
+    interestedInSelfNotifications: boolean
   ): Promise<UnsubscribeFn> {
     const response = await this.requestHandler.sendRequest<SubscriptionResult>(
       payload
@@ -177,18 +186,24 @@ export class Realtime implements MessageHandler<unknown> {
     this.subscriptionChannelPayloads.set(channelID, payload);
 
     // Create room if not exists
-    if (!this.roomsMap.has(roomID)) this.roomsMap.set(roomID, new Room(roomID));
+    if (!this.roomsMap.has(roomID))
+      this.roomsMap.set(roomID, new Room(roomID, this.sdkInstanceId));
 
     const room = this.roomsMap.get(roomID)!;
 
     // Update channels for room
-    room.addObserver(channelID, cb); // Add channel to room
+    const channelInterest: ChannelInterest = {
+      interestedInSelfNotifications,
+      notify: cb,
+    };
+
+    room.addObserver(channelID, channelInterest); // Add channel to room
 
     this.logger.log("New subscription", room.infos());
 
     return async () => {
       // Detach observer and update room
-      room.removeObserver(channelID, cb);
+      room.removeObserver(channelID, channelInterest);
 
       // Remove handler for restoring subscriptions in case of a reconnection.
       if (!room.hasRemainingInterestForChannel(channelID))

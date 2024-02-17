@@ -5,10 +5,18 @@ import {
   NotificationCallback,
 } from "../common";
 
-export class Room {
-  private readonly channelsMap = new Map<string, Set<NotificationCallback>>();
+export type ChannelInterest = {
+  interestedInSelfNotifications: boolean;
+  notify: NotificationCallback;
+};
 
-  constructor(private readonly id: string) {}
+export class Room {
+  private readonly channelsMap = new Map<string, Set<ChannelInterest>>();
+
+  constructor(
+    private readonly id: string,
+    private readonly sdkInstanceId: string
+  ) {}
 
   notifyChannel(
     channel: string,
@@ -20,6 +28,8 @@ export class Room {
   ) {
     // We just skip silently because this only happens if the at some point the user subscribed to a channel like presence notification, or document notification and then unsubscribed from it. Resulting in a notification being sent to a channel that is not registered anymore. And kuzzle only allows to unsubscribe from a room, not from a channel. {@link https://docs.kuzzle.io/core/2/api/controllers/realtime/unsubscribe/}
     if (!this.channelsMap.has(channel)) return;
+
+    const isFromSelf = this.sdkInstanceId === message.volatile?.sdkInstanceId;
 
     switch (message.type) {
       case "TokenExpired":
@@ -34,7 +44,12 @@ export class Room {
           event: message.event,
           type: message.event === "publish" ? "ephemeral" : "document",
         };
-        this.channelsMap.get(channel)!.forEach((notify) => notify(mapped));
+        this.channelsMap
+          .get(channel)!
+          .forEach(
+            ({ interestedInSelfNotifications, notify }) =>
+              (interestedInSelfNotifications || !isFromSelf) && notify(mapped)
+          );
         break;
       }
       case "user": {
@@ -44,7 +59,12 @@ export class Room {
           timestamp: message.timestamp,
           volatile: message.volatile,
         };
-        this.channelsMap.get(channel)!.forEach((notify) => notify(mapped));
+        this.channelsMap
+          .get(channel)!
+          .forEach(
+            ({ interestedInSelfNotifications, notify }) =>
+              (interestedInSelfNotifications || !isFromSelf) && notify(mapped)
+          );
       }
     }
   }
@@ -79,14 +99,15 @@ export class Room {
     );
   }
 
-  addObserver(forChannelID: string, withCb: NotificationCallback) {
+  addObserver(forChannelID: string, channelInterest: ChannelInterest) {
     if (!this.channelsMap.has(forChannelID))
       this.channelsMap.set(forChannelID, new Set());
-    this.channelsMap.get(forChannelID)!.add(withCb);
+
+    this.channelsMap.get(forChannelID)!.add(channelInterest);
   }
 
-  removeObserver(channel: string, cb: NotificationCallback) {
-    this.channelsMap.get(channel)!.delete(cb);
+  removeObserver(channel: string, channelInterest: ChannelInterest) {
+    this.channelsMap.get(channel)!.delete(channelInterest);
     if (this.channelsMap.get(channel)!.size === 0) {
       this.channelsMap.delete(channel);
     }

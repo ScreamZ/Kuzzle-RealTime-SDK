@@ -46,7 +46,7 @@ export type KuzzleNotificationMessage<T = unknown> = KuzzleMessage<T> & {
   timestamp: number;
   type: "user" | "document" | "TokenExpired";
   event: "write" | "delete" | "publish";
-  volatile: object;
+  volatile: Record<string, unknown>;
   action: string;
 };
 

@@ -37,19 +37,45 @@ export class Document extends Controller {
     return response.result;
   };
 
-  update = async <T extends object>(
+  update = async <T extends object, Opts extends UpdateUpsertOpts>(
     index: string,
     collection: string,
     id: string,
-    body: Partial<T>
+    body: Partial<T>,
+    opts?: Opts
   ) => {
-    const response = await this.requestHandler.sendRequest<boolean>({
+    const response = await this.requestHandler.sendRequest<
+      UpdateUpsertResult<T, Opts>
+    >({
       controller: "document",
       action: "update",
       index,
       collection,
       _id: id,
       body,
+      ...opts,
+    });
+
+    return response.result;
+  };
+
+  upsert = async <T extends object, Opts extends UpdateUpsertOpts>(
+    index: string,
+    collection: string,
+    _id: string,
+    body: { changes: Partial<T>; default?: Partial<T> },
+    opts?: Opts
+  ) => {
+    const response = await this.requestHandler.sendRequest<
+      UpdateUpsertResult<T, Opts>
+    >({
+      controller: "document",
+      action: "upsert",
+      index,
+      collection,
+      _id,
+      body,
+      ...opts,
     });
 
     return response.result;
@@ -98,14 +124,14 @@ export class Document extends Controller {
     return response.result._id;
   };
 
-  deleteByQuery = async <T extends object>(
+  deleteByQuery = async <T extends object, Opts extends DeleteByQueryOpts>(
     index: string,
     collection: string,
     query = {},
-    options: DeleteByQueryOpts = {}
+    options?: Opts
   ) => {
     const response = await this.requestHandler.sendRequest<
-      DeleteByQueryResult<T>
+      DeleteByQueryResult<T, Opts>
     >({
       controller: "document",
       action: "deleteByQuery",
@@ -167,20 +193,48 @@ type SearchResult<T> = {
   remaining?: number;
 };
 
-type DeleteByQueryResult<T extends object> = {
-  documents: Array<{ _id: string; source?: T }>;
-};
-
 type DeleteByQueryOpts = {
   silent?: boolean;
   lang?: "elasticsearch" | "koncorde";
   source?: boolean;
 };
 
+type DeleteByQueryResult<T extends object, Opts extends DeleteByQueryOpts> = {
+  documents: Array<
+    { _id: string } & (Opts["source"] extends true ? { source: T } : {})
+  >;
+};
+
 type mCreateOpts = {
   silent?: boolean;
   strict?: boolean;
 };
+
+type UpdateUpsertOpts = {
+  /** If set to `wait_for`, Kuzzle will not respond until the update is indexed. */
+  refresh?: "wait_for" | "false";
+  /**
+   * Conflicts may occurs if the same document gets updated multiple times within a short timespan, in a database cluster. You can set the retryOnConflict optional argument (with a retry count), to tell Kuzzle to retry the failing updates the specified amount of times before rejecting the request with an error.
+   */
+  retryOnConflict?: number;
+  /** If set to `true` Kuzzle will return the entire updated document body in the response. */
+  source?: boolean;
+  /** If set, then Kuzzle will not generate notifications */
+  silent?: boolean;
+};
+
+type UpdateUpsertResult<T extends object, Opts extends UpdateUpsertOpts> = {
+  id: string;
+  /** Updated document version */
+  _version: number;
+  /** If `true`, a new document was created, otherwise the document existed and was updated */
+  created: boolean;
+} & (Opts["source"] extends true
+  ? {
+      /** Actualized document content */
+      _source: T;
+    }
+  : {});
 
 export type mCreateResult<T extends object> = {
   /**

@@ -79,12 +79,13 @@ declare class Logger {
 }
 
 declare class RequestHandler implements MessageHandler<unknown> {
-    private socket;
+    private readonly socket;
+    private readonly sdkInstanceId;
     private authToken?;
     private readonly pendingRequests;
     private readonly timeout;
     private volatile;
-    constructor(socket: WebSocket, authToken?: string | undefined);
+    constructor(socket: WebSocket, sdkInstanceId: string, authToken?: string | undefined);
     getPublicAPI: () => {
         sendRequest: <Result>(payload: object) => Promise<KuzzleMessage<Result>>;
         setVolatileData: (data: Record<string, unknown>) => void;
@@ -108,27 +109,28 @@ type PresenceSubscriptionArgs = {
 };
 declare class Realtime implements MessageHandler<unknown> {
     private requestHandler;
+    private readonly sdkInstanceId;
     private logger;
     private readonly roomsMap;
     /**
      * Used to restore subscriptions in case of a reconnection.
      */
     private readonly subscriptionChannelPayloads;
-    constructor(requestHandler: RequestHandler, logger: Logger);
+    constructor(requestHandler: RequestHandler, sdkInstanceId: string, logger: Logger);
     /**
      * Subscribe to document notifications. Those could be ephemeral or persistent.
      *
      * @param filters Koncorde filters
      * @param cb Called when a notification is received and match filter
      */
-    subscribeToDocumentNotifications: <T extends Object>(args: DocumentSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<UnsubscribeFn>;
+    subscribeToDocumentNotifications: <T extends Object>(args: DocumentSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void, interestInSelfNotifications?: boolean) => Promise<UnsubscribeFn>;
     /**
      * Subscribe to presence notification, when user enter/leave same room.
      *
      * @param filters Koncorde filters
      * @param cb Called when a notification is received and match filter
      */
-    subscribeToPresenceNotifications: <T extends object>(args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzlePresenceNotification<T>) => void) => Promise<UnsubscribeFn>;
+    subscribeToPresenceNotifications: <T extends object>(args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzlePresenceNotification<T>) => void, interestInSelfNotifications?: boolean) => Promise<UnsubscribeFn>;
     /**
      * Send ephemeral notification. This is a one-time notification, not persisted in storage.
      *
@@ -139,8 +141,8 @@ declare class Realtime implements MessageHandler<unknown> {
         collection: string;
     }, payload: object) => Promise<KuzzleMessage<unknown>>;
     getPublicAPI: () => {
-        subscribeToDocumentNotifications: <T extends Object>(args: DocumentSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void) => Promise<UnsubscribeFn>;
-        subscribeToPresenceNotifications: <T_1 extends object>(args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzlePresenceNotification<T_1>) => void) => Promise<UnsubscribeFn>;
+        subscribeToDocumentNotifications: <T extends Object>(args: DocumentSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzleDocumentNotification<T>) => void, interestInSelfNotifications?: boolean) => Promise<UnsubscribeFn>;
+        subscribeToPresenceNotifications: <T_1 extends object>(args: PresenceSubscriptionArgs, filters: {} | undefined, cb: (notification: KuzzlePresenceNotification<T_1>) => void, interestInSelfNotifications?: boolean) => Promise<UnsubscribeFn>;
         sendEphemeralNotification: (args: {
             index: string;
             collection: string;
@@ -179,17 +181,22 @@ declare class Document extends Controller {
         _id?: string | undefined;
         body: T;
     }[], options?: mCreateOpts) => Promise<mCreateResult<T>>;
-    update: <T extends object>(index: string, collection: string, id: string, body: Partial<T>) => Promise<boolean>;
+    update: <T extends object, Opts extends UpdateUpsertOpts>(index: string, collection: string, id: string, body: Partial<T>, opts?: Opts | undefined) => Promise<UpdateUpsertResult<T, Opts>>;
+    upsert: <T extends object, Opts extends UpdateUpsertOpts>(index: string, collection: string, _id: string, body: {
+        changes: Partial<T>;
+        default?: Partial<T> | undefined;
+    }, opts?: Opts | undefined) => Promise<UpdateUpsertResult<T, Opts>>;
     get: <T extends object = object>(index: string, collection: string, id: string) => Promise<{
         _id: string;
         _source: T;
     }>;
     exists: (index: string, collection: string, id: string) => Promise<boolean>;
     delete: (index: string, collection: string, id: string) => Promise<string>;
-    deleteByQuery: <T extends object>(index: string, collection: string, query?: {}, options?: DeleteByQueryOpts) => Promise<{
+    deleteByQuery: <T extends object, Opts extends DeleteByQueryOpts>(index: string, collection: string, query?: {}, options?: Opts | undefined) => Promise<({
         _id: string;
-        source?: T | undefined;
-    }[]>;
+    } & (Opts["source"] extends true ? {
+        source: T;
+    } : {}))[]>;
     search: <T extends object = object>(index: string, collection: string, body: SearchBody, options?: SearchOptions) => Promise<SearchResult<T>>;
 }
 type SearchBody = {
@@ -228,6 +235,28 @@ type mCreateOpts = {
     silent?: boolean;
     strict?: boolean;
 };
+type UpdateUpsertOpts = {
+    /** If set to `wait_for`, Kuzzle will not respond until the update is indexed. */
+    refresh?: "wait_for" | "false";
+    /**
+     * Conflicts may occurs if the same document gets updated multiple times within a short timespan, in a database cluster. You can set the retryOnConflict optional argument (with a retry count), to tell Kuzzle to retry the failing updates the specified amount of times before rejecting the request with an error.
+     */
+    retryOnConflict?: number;
+    /** If set to `true` Kuzzle will return the entire updated document body in the response. */
+    source?: boolean;
+    /** If set, then Kuzzle will not generate notifications */
+    silent?: boolean;
+};
+type UpdateUpsertResult<T extends object, Opts extends UpdateUpsertOpts> = {
+    id: string;
+    /** Updated document version */
+    _version: number;
+    /** If `true`, a new document was created, otherwise the document existed and was updated */
+    created: boolean;
+} & (Opts["source"] extends true ? {
+    /** Actualized document content */
+    _source: T;
+} : {});
 type mCreateResult<T extends object> = {
     /**
      * Array of succeeded operations
@@ -311,6 +340,10 @@ type GetCurrentUserResult<T> = {
 
 declare class KuzzleRealtimeSDK {
     private config?;
+    /**
+     * A unique identifier for various usage, but also to be able to detect notification triggered from the SDK itself.
+     */
+    private readonly sdkInstanceId;
     readonly requestHandler: ReturnType<RequestHandler["getPublicAPI"]>;
     readonly realtime: ReturnType<Realtime["getPublicAPI"]>;
     readonly collection: Collection;
@@ -323,7 +356,6 @@ declare class KuzzleRealtimeSDK {
     private readonly logger;
     private readonly socket;
     constructor(host: string, config?: SDKConfig | undefined);
-    on(event: "open" | "close" | "error", cb: (event: Event) => void): void;
     disconnect(): void;
 }
 

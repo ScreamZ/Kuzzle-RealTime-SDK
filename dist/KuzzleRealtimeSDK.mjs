@@ -31,13 +31,16 @@ var PingHandler = class {
 
 // src/Realtime/Room.ts
 var Room = class {
-  constructor(id) {
+  constructor(id, sdkInstanceId) {
     this.id = id;
+    this.sdkInstanceId = sdkInstanceId;
   }
   channelsMap = /* @__PURE__ */ new Map();
   notifyChannel(channel, message) {
+    var _a;
     if (!this.channelsMap.has(channel))
       return;
+    const isFromSelf = this.sdkInstanceId === ((_a = message.volatile) == null ? void 0 : _a.sdkInstanceId);
     switch (message.type) {
       case "TokenExpired":
         break;
@@ -49,7 +52,9 @@ var Room = class {
           event: message.event,
           type: message.event === "publish" ? "ephemeral" : "document"
         };
-        this.channelsMap.get(channel).forEach((notify) => notify(mapped));
+        this.channelsMap.get(channel).forEach(
+          ({ interestedInSelfNotifications, notify }) => (interestedInSelfNotifications || !isFromSelf) && notify(mapped)
+        );
         break;
       }
       case "user": {
@@ -59,7 +64,9 @@ var Room = class {
           timestamp: message.timestamp,
           volatile: message.volatile
         };
-        this.channelsMap.get(channel).forEach((notify) => notify(mapped));
+        this.channelsMap.get(channel).forEach(
+          ({ interestedInSelfNotifications, notify }) => (interestedInSelfNotifications || !isFromSelf) && notify(mapped)
+        );
       }
     }
   }
@@ -88,13 +95,13 @@ var Room = class {
   hasRemainingInterestForChannel(channel) {
     return this.channelsMap.has(channel) && this.channelsMap.get(channel).size > 0;
   }
-  addObserver(forChannelID, withCb) {
+  addObserver(forChannelID, channelInterest) {
     if (!this.channelsMap.has(forChannelID))
       this.channelsMap.set(forChannelID, /* @__PURE__ */ new Set());
-    this.channelsMap.get(forChannelID).add(withCb);
+    this.channelsMap.get(forChannelID).add(channelInterest);
   }
-  removeObserver(channel, cb) {
-    this.channelsMap.get(channel).delete(cb);
+  removeObserver(channel, channelInterest) {
+    this.channelsMap.get(channel).delete(channelInterest);
     if (this.channelsMap.get(channel).size === 0) {
       this.channelsMap.delete(channel);
     }
@@ -103,8 +110,9 @@ var Room = class {
 
 // src/Realtime/Realtime.ts
 var Realtime = class {
-  constructor(requestHandler, logger) {
+  constructor(requestHandler, sdkInstanceId, logger) {
     this.requestHandler = requestHandler;
+    this.sdkInstanceId = sdkInstanceId;
     this.logger = logger;
   }
   roomsMap = /* @__PURE__ */ new Map();
@@ -118,7 +126,7 @@ var Realtime = class {
    * @param filters Koncorde filters
    * @param cb Called when a notification is received and match filter
    */
-  subscribeToDocumentNotifications = (args, filters = {}, cb) => {
+  subscribeToDocumentNotifications = (args, filters = {}, cb, interestInSelfNotifications = true) => {
     const payload = {
       ...args,
       controller: "realtime",
@@ -128,7 +136,8 @@ var Realtime = class {
     };
     return this.registerSubscriptionCallback(
       payload,
-      cb
+      cb,
+      interestInSelfNotifications
     );
   };
   /**
@@ -137,7 +146,7 @@ var Realtime = class {
    * @param filters Koncorde filters
    * @param cb Called when a notification is received and match filter
    */
-  subscribeToPresenceNotifications = (args, filters = {}, cb) => {
+  subscribeToPresenceNotifications = (args, filters = {}, cb, interestInSelfNotifications = true) => {
     const payload = {
       ...args,
       controller: "realtime",
@@ -148,7 +157,8 @@ var Realtime = class {
     };
     return this.registerSubscriptionCallback(
       payload,
-      cb
+      cb,
+      interestInSelfNotifications
     );
   };
   /**
@@ -206,7 +216,7 @@ var Realtime = class {
     );
     this.logger.log("Subscriptions restored.");
   };
-  async registerSubscriptionCallback(payload, cb) {
+  async registerSubscriptionCallback(payload, cb, interestedInSelfNotifications) {
     const response = await this.requestHandler.sendRequest(
       payload
     );
@@ -215,12 +225,16 @@ var Realtime = class {
     const { roomId: roomID, channel: channelID } = response.result;
     this.subscriptionChannelPayloads.set(channelID, payload);
     if (!this.roomsMap.has(roomID))
-      this.roomsMap.set(roomID, new Room(roomID));
+      this.roomsMap.set(roomID, new Room(roomID, this.sdkInstanceId));
     const room = this.roomsMap.get(roomID);
-    room.addObserver(channelID, cb);
+    const channelInterest = {
+      interestedInSelfNotifications,
+      notify: cb
+    };
+    room.addObserver(channelID, channelInterest);
     this.logger.log("New subscription", room.infos());
     return async () => {
-      room.removeObserver(channelID, cb);
+      room.removeObserver(channelID, channelInterest);
       if (!room.hasRemainingInterestForChannel(channelID))
         this.subscriptionChannelPayloads.delete(channelID);
       if (!room.hasRemainingInterestForRoom()) {
@@ -240,13 +254,15 @@ var Realtime = class {
   }
 };
 var RequestHandler = class {
-  constructor(socket, authToken) {
+  constructor(socket, sdkInstanceId, authToken) {
     this.socket = socket;
+    this.sdkInstanceId = sdkInstanceId;
     this.authToken = authToken;
+    this.volatile = { sdkInstanceId: this.sdkInstanceId };
   }
   pendingRequests = /* @__PURE__ */ new Map();
   timeout = 5e3;
-  volatile = {};
+  volatile;
   getPublicAPI = () => ({
     sendRequest: this.sendRequest,
     setVolatileData: this.setVolatileData,
@@ -263,7 +279,7 @@ var RequestHandler = class {
     return true;
   }
   setVolatileData = (data) => {
-    this.volatile = data;
+    this.volatile = { ...data, sdkInstanceId: this.sdkInstanceId };
   };
   sendRequest = (payload) => new Promise((resolve, reject) => {
     const id = nanoid();
@@ -364,14 +380,27 @@ var Document = class extends Controller {
     });
     return response.result;
   };
-  update = async (index, collection, id, body) => {
+  update = async (index, collection, id, body, opts) => {
     const response = await this.requestHandler.sendRequest({
       controller: "document",
       action: "update",
       index,
       collection,
       _id: id,
-      body
+      body,
+      ...opts
+    });
+    return response.result;
+  };
+  upsert = async (index, collection, _id, body, opts) => {
+    const response = await this.requestHandler.sendRequest({
+      controller: "document",
+      action: "upsert",
+      index,
+      collection,
+      _id,
+      body,
+      ...opts
     });
     return response.result;
   };
@@ -405,7 +434,7 @@ var Document = class extends Controller {
     });
     return response.result._id;
   };
-  deleteByQuery = async (index, collection, query = {}, options = {}) => {
+  deleteByQuery = async (index, collection, query = {}, options) => {
     const response = await this.requestHandler.sendRequest({
       controller: "document",
       action: "deleteByQuery",
@@ -506,12 +535,11 @@ var AuthenticationHandler = class {
     return {};
   }
 };
-
-// src/KuzzleRealtimeSDK.ts
 var KuzzleRealtimeSDK = class {
   constructor(host, config) {
     this.config = config;
     var _a, _b, _c, _d, _e, _f;
+    this.sdkInstanceId = nanoid();
     this.logger = new Logger((config == null ? void 0 : config.debug) ?? false);
     this.socket = new WebSocket(
       `${((_a = this.config) == null ? void 0 : _a.ssl) ? "wss" : "ws"}://${host}:${((_b = this.config) == null ? void 0 : _b.port) || 7512}`,
@@ -527,10 +555,15 @@ var KuzzleRealtimeSDK = class {
     const pingHandler = new PingHandler(this.socket);
     const requestHandler = new RequestHandler(
       this.socket,
+      this.sdkInstanceId,
       (_f = this.config) == null ? void 0 : _f.authToken
     );
     const authHandler = new AuthenticationHandler(requestHandler);
-    const realtime = new Realtime(requestHandler, this.logger);
+    const realtime = new Realtime(
+      requestHandler,
+      this.sdkInstanceId,
+      this.logger
+    );
     this.requestHandler = requestHandler.getPublicAPI();
     this.realtime = realtime.getPublicAPI();
     this.collection = new Collection(requestHandler);
@@ -563,6 +596,10 @@ var KuzzleRealtimeSDK = class {
       this.logger.log("SDK - Socket error", event);
     });
   }
+  /**
+   * A unique identifier for various usage, but also to be able to detect notification triggered from the SDK itself.
+   */
+  sdkInstanceId;
   // Controllers
   requestHandler;
   realtime;
@@ -578,9 +615,6 @@ var KuzzleRealtimeSDK = class {
   }
   logger;
   socket;
-  on(event, cb) {
-    this.socket.addEventListener(event, cb);
-  }
   disconnect() {
     this.socket.close();
   }

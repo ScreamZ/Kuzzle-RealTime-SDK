@@ -8,9 +8,15 @@ type RequestHandlerFn = (response: KuzzleMessage<unknown>) => void;
 export class RequestHandler implements MessageHandler<unknown> {
   private readonly pendingRequests = new Map<string, RequestHandlerFn>();
   private readonly timeout = 5000;
-  private volatile: Record<string, unknown> = {};
+  private volatile: Record<string, unknown>;
 
-  constructor(private socket: WebSocket, private authToken?: string) {}
+  constructor(
+    private readonly socket: WebSocket,
+    private readonly sdkInstanceId: string,
+    private authToken?: string
+  ) {
+    this.volatile = { sdkInstanceId: this.sdkInstanceId };
+  }
 
   getPublicAPI = () => ({
     sendRequest: this.sendRequest,
@@ -32,7 +38,7 @@ export class RequestHandler implements MessageHandler<unknown> {
   }
 
   public setVolatileData = (data: Record<string, unknown>) => {
-    this.volatile = data;
+    this.volatile = { ...data, sdkInstanceId: this.sdkInstanceId };
   };
 
   public sendRequest = <Result>(payload: object) =>

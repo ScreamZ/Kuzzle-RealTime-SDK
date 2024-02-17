@@ -10,8 +10,14 @@ import { Document } from "./controllers/Document";
 import { Logger } from "./Logger";
 import { Authentication } from "./controllers/Authentication";
 import { AuthenticationHandler } from "./handlers/AuthenticationHandler";
+import { nanoid } from "nanoid";
 
 export class KuzzleRealtimeSDK {
+  /**
+   * A unique identifier for various usage, but also to be able to detect notification triggered from the SDK itself.
+   */
+  private readonly sdkInstanceId: string;
+
   // Controllers
   readonly requestHandler: ReturnType<RequestHandler["getPublicAPI"]>;
   readonly realtime: ReturnType<Realtime["getPublicAPI"]>;
@@ -32,6 +38,8 @@ export class KuzzleRealtimeSDK {
   private readonly socket: WebSocket;
 
   constructor(host: string, private config?: SDKConfig) {
+    this.sdkInstanceId = nanoid();
+
     this.logger = new Logger(config?.debug ?? false);
     this.socket = new WebSocket(
       `${this.config?.ssl ? "wss" : "ws"}://${host}:${
@@ -52,10 +60,15 @@ export class KuzzleRealtimeSDK {
     const pingHandler = new PingHandler(this.socket);
     const requestHandler = new RequestHandler(
       this.socket,
+      this.sdkInstanceId,
       this.config?.authToken
     );
     const authHandler = new AuthenticationHandler(requestHandler);
-    const realtime = new Realtime(requestHandler, this.logger);
+    const realtime = new Realtime(
+      requestHandler,
+      this.sdkInstanceId,
+      this.logger
+    );
 
     // Bind public APIs
     this.requestHandler = requestHandler.getPublicAPI();
@@ -98,10 +111,6 @@ export class KuzzleRealtimeSDK {
     this.socket.addEventListener("error", (event) => {
       this.logger.log("SDK - Socket error", event);
     });
-  }
-
-  on(event: "open" | "close" | "error", cb: (event: Event) => void) {
-    this.socket.addEventListener(event, cb);
   }
 
   disconnect() {
