@@ -1,77 +1,77 @@
-import { WebSocket } from "partysocket";
 import { nanoid } from "nanoid";
+import type { WebSocket } from "partysocket";
 
-import { KuzzleMessage, MessageHandler } from "../common";
+import type { KuzzleMessage, MessageHandler } from "../common";
 
 type RequestHandlerFn = (response: KuzzleMessage<unknown>) => void;
 
 export class RequestHandler implements MessageHandler<unknown> {
-  private readonly pendingRequests = new Map<string, RequestHandlerFn>();
-  private readonly timeout = 5000;
-  private volatile: Record<string, unknown>;
+	private readonly pendingRequests = new Map<string, RequestHandlerFn>();
+	private readonly timeout = 5000;
+	private volatile: Record<string, unknown>;
 
-  constructor(
-    private readonly socket: WebSocket,
-    private readonly sdkInstanceId: string,
-    private authToken?: string
-  ) {
-    this.volatile = { sdkInstanceId: this.sdkInstanceId };
-  }
+	constructor(
+		private readonly socket: WebSocket,
+		private readonly sdkInstanceId: string,
+		private authToken?: string,
+	) {
+		this.volatile = { sdkInstanceId: this.sdkInstanceId };
+	}
 
-  getPublicAPI = () => ({
-    sendRequest: this.sendRequest,
-    setVolatileData: this.setVolatileData,
-    setAuthToken: this.setAuthToken,
-  });
+	getPublicAPI = () => ({
+		sendRequest: this.sendRequest,
+		setVolatileData: this.setVolatileData,
+		setAuthToken: this.setAuthToken,
+	});
 
-  handleMessage(message: KuzzleMessage<unknown>): boolean {
-    // If request ID is not the same as room, it's a notification.
-    if (message.requestId !== message.room) return false;
+	handleMessage(message: KuzzleMessage<unknown>): boolean {
+		// If request ID is not the same as room, it's a notification.
+		if (message.requestId !== message.room) return false;
 
-    const matchingRequestResolver = this.pendingRequests.get(message.requestId);
+		const matchingRequestResolver = this.pendingRequests.get(message.requestId);
 
-    if (!matchingRequestResolver) return false;
+		if (!matchingRequestResolver) return false;
 
-    matchingRequestResolver(message);
-    this.pendingRequests.delete(message.requestId);
-    return true;
-  }
+		matchingRequestResolver(message);
+		this.pendingRequests.delete(message.requestId);
+		return true;
+	}
 
-  public setVolatileData = (data: Record<string, unknown>) => {
-    this.volatile = { ...data, sdkInstanceId: this.sdkInstanceId };
-  };
+	public setVolatileData = (data: Record<string, unknown>) => {
+		this.volatile = { ...data, sdkInstanceId: this.sdkInstanceId };
+	};
 
-  public sendRequest = <Result>(payload: object) =>
-    new Promise<KuzzleMessage<Result>>((resolve, reject) => {
-      const id = nanoid();
+	public sendRequest = <Result>(payload: object) =>
+		new Promise<KuzzleMessage<Result>>((resolve, reject) => {
+			const id = nanoid();
 
-      // Init timeout
-      const timeoutRef = setTimeout(
-        () => reject("Request timed out"),
-        this.timeout
-      );
+			// Init timeout
+			const timeoutRef = setTimeout(
+				() => reject("Request timed out"),
+				this.timeout,
+			);
 
-      // Add handler and timeout clearer.
-      this.pendingRequests.set(id, (responsePayload) => {
-        clearTimeout(timeoutRef);
+			// Add handler and timeout clearer.
+			this.pendingRequests.set(id, (responsePayload) => {
+				clearTimeout(timeoutRef);
 
-        return responsePayload.error
-          ? reject(responsePayload.error)
-          : resolve(responsePayload as KuzzleMessage<Result>);
-      });
+				return responsePayload.error
+					? reject(responsePayload.error)
+					: resolve(responsePayload as KuzzleMessage<Result>);
+			});
 
-      // Send request
-      this.socket.send(
-        JSON.stringify({
-          ...payload,
-          requestId: id,
-          volatile: this.volatile,
-          ...(this.authToken && { jwt: this.authToken }), // Add token if defined
-        })
-      );
-    });
+			// Send request
+			this.socket.send(
+				JSON.stringify({
+					...payload,
+					requestId: id,
+					volatile: this.volatile,
+					...(this.authToken && { jwt: this.authToken }), // Add token if defined
+				}),
+			);
+		});
 
-  public setAuthToken = (token?: string) => {
-    this.authToken = token;
-  };
+	public setAuthToken = (token?: string) => {
+		this.authToken = token;
+	};
 }

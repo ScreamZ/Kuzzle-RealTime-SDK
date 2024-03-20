@@ -1,5 +1,5 @@
-import { RequestHandler } from "./handlers/RequestHandler";
+import type { RequestHandler } from "./handlers/RequestHandler";
 
 export class Controller {
-  constructor(protected requestHandler: RequestHandler) {}
+	constructor(protected requestHandler: RequestHandler) {}
 }

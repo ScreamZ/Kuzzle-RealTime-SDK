@@ -1,9 +1,16 @@
-import { KuzzleRealtimeSDK } from "../KuzzleRealtimeSDK";
+import { KuzzleRealtimeSDK } from "../src/KuzzleRealtimeSDK";
 
-const aaa = new KuzzleRealtimeSDK("192.168.1.140");
-const res = await aaa.requestHandler.sendRequest({
-  controller: "server",
-  action: "now",
+const sdk = new KuzzleRealtimeSDK("localhost", {
+  authToken: "SomeApiToken",
 });
 
-console.log(res);
+sdk.realtime.subscribeToPresenceNotifications(
+  { index: "freakshow", collection: "presence", users: "all" },
+  {},
+  console.log,
+  false
+);
+
+sdk.document.update<{ name: string }>("freakshow", "presence", "1", {
+  name: "John",
+});
